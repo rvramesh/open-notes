@@ -1,0 +1,10 @@
+{
+  "name": "@open-notes/electron",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "devDependencies": {
+    "electron": "^30.0.1",
+    "typescript": "^5.2.2"
+  }
+}
