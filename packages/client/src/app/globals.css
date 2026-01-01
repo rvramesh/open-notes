@@ -153,8 +153,8 @@
   --shadow-xl: calc(var(--shadow-x) * 6) calc(var(--shadow-y) * 6) calc(var(--shadow-blur) * 7)
     calc(var(--shadow-spread) - 5px)
     color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 100%), transparent);
-  --shadow-2xl: calc(var(--shadow-x) * 8) calc(var(--shadow-y) * 8) calc(max(0px, var(--shadow-blur) * 9 - 8px))
-    calc(var(--shadow-spread) - 12px)
+  --shadow-2xl: calc(var(--shadow-x) * 8) calc(var(--shadow-y) * 8)
+    calc(max(0px, var(--shadow-blur) * 9 - 8px)) calc(var(--shadow-spread) - 12px)
     color-mix(in srgb, var(--shadow-color) calc(var(--shadow-opacity) * 250%), transparent);
   --shadow: var(--shadow-md);
   --color-shadow-color: var(--shadow-color);
@@ -176,17 +176,19 @@
   }
 }
 
-
 [contenteditable="true"],
 [contenteditable="true"] a,
 .notes-section span,
 .notes-section input,
 .notes-section p {
-  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="22" viewBox="0 0 8 22"><g stroke="white" stroke-width="2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g><g stroke="black" stroke-width="1.2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g></svg>') 4 11, text;
+  cursor:
+    url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="22" viewBox="0 0 8 22"><g stroke="white" stroke-width="2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g><g stroke="black" stroke-width="1.2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g></svg>')
+      4 11,
+    text;
 }
 
 .notes-section button,
-.notes-section button>* {
+.notes-section button > * {
   cursor: pointer;
 }
 
@@ -194,12 +196,11 @@
 .dark [contenteditable="true"] a,
 .dark .notes-section span,
 .dark .notes-section input,
-.dark .notes-section p  {
+.dark .notes-section p {
   cursor: text;
 }
 
-
 .dark .notes-section button,
-.dark .notes-section button>* {
+.dark .notes-section button > * {
   cursor: pointer;
 }

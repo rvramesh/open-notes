@@ -1,38 +1,37 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { AboutDialog } from "@/components/about-dialog"; // Import AboutDialog component
+import { Button } from "@/components/ui/button";
+import type { Category, Note, Tag } from "@/lib/types";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { format, isThisWeek, isToday } from "date-fns";
 import {
+  Brain,
+  Calendar,
   ChevronDown,
   ChevronRight,
-  Calendar,
-  List,
   FolderTree,
-  SettingsIcon,
   Info,
-  Brain,
-  X,
+  List,
   Loader2,
-} from "lucide-react"
-import type { Note, Tag, Category } from "@/lib/types"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import { format, isToday, isThisWeek } from "date-fns"
-import { formatRelativeTime } from "@/lib/utils"
-import { AboutDialog } from "@/components/about-dialog" // Import AboutDialog component
+  SettingsIcon,
+  X,
+} from "lucide-react";
+import { useState } from "react";
 
-type ViewMode = "category" | "time" | "flat" | "search"
+type ViewMode = "category" | "time" | "flat" | "search";
 
 interface NotesTreeProps {
-  notes: Note[]
-  tags: Tag[]
-  categories: Category[]
-  selectedNoteId: string | null
-  onSelectNote: (noteId: string) => void
-  onOpenSettings: () => void
-  isSearchActive: boolean
-  searchQuery: string
-  searchResults: Note[]
-  onClearSearch: () => void
+  notes: Note[];
+  tags: Tag[];
+  categories: Category[];
+  selectedNoteId: string | null;
+  onSelectNote: (noteId: string) => void;
+  onOpenSettings: () => void;
+  isSearchActive: boolean;
+  searchQuery: string;
+  searchResults: Note[];
+  onClearSearch: () => void;
 }
 
 export function NotesTree({
@@ -47,30 +46,32 @@ export function NotesTree({
   searchResults,
   onClearSearch,
 }: NotesTreeProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>("category")
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set(categories.map((c) => c.id)))
-  const [displayCount, setDisplayCount] = useState(20)
-  const [isLoadingMore, setIsLoadingMore] = useState(false)
-  const [isAboutOpen, setIsAboutOpen] = useState(false) // Add state for about dialog
+  const [viewMode, setViewMode] = useState<ViewMode>("category");
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    new Set(categories.map((c) => c.id))
+  );
+  const [displayCount, setDisplayCount] = useState(20);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false); // Add state for about dialog
 
-  const effectiveViewMode = isSearchActive ? "search" : viewMode
+  const effectiveViewMode = isSearchActive ? "search" : viewMode;
 
   const toggleCategory = (categoryId: string) => {
     setExpandedCategories((prev) => {
-      const next = new Set(prev)
+      const next = new Set(prev);
       if (next.has(categoryId)) {
-        next.delete(categoryId)
+        next.delete(categoryId);
       } else {
-        next.add(categoryId)
+        next.add(categoryId);
       }
-      return next
-    })
-  }
+      return next;
+    });
+  };
 
   const renderCategoryView = () => {
     return categories.map((category) => {
-      const categoryNotes = notes.filter((note) => note.categoryIds.includes(category.id))
-      const isExpanded = expandedCategories.has(category.id)
+      const categoryNotes = notes.filter((note) => note.categoryIds.includes(category.id));
+      const isExpanded = expandedCategories.has(category.id);
 
       return (
         <div key={category.id} className="mb-0.5">
@@ -99,19 +100,26 @@ export function NotesTree({
             </div>
           )}
         </div>
-      )
-    })
-  }
+      );
+    });
+  };
 
   const renderTimeView = () => {
-    const todayNotes = notes.filter((note) => isToday(note.updatedAt))
-    const thisWeekNotes = notes.filter((note) => isThisWeek(note.updatedAt) && !isToday(note.updatedAt))
-    const olderNotes = notes.filter((note) => !isThisWeek(note.updatedAt))
+    const todayNotes = notes.filter((note) => isToday(note.updatedAt));
+    const thisWeekNotes = notes.filter(
+      (note) => isThisWeek(note.updatedAt) && !isToday(note.updatedAt)
+    );
+    const olderNotes = notes.filter((note) => !isThisWeek(note.updatedAt));
 
     return (
       <>
         {todayNotes.length > 0 && (
-          <TimeGroup title="Today" notes={todayNotes} selectedNoteId={selectedNoteId} onSelectNote={onSelectNote} />
+          <TimeGroup
+            title="Today"
+            notes={todayNotes}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={onSelectNote}
+          />
         )}
         {thisWeekNotes.length > 0 && (
           <TimeGroup
@@ -122,11 +130,16 @@ export function NotesTree({
           />
         )}
         {olderNotes.length > 0 && (
-          <TimeGroup title="Older" notes={olderNotes} selectedNoteId={selectedNoteId} onSelectNote={onSelectNote} />
+          <TimeGroup
+            title="Older"
+            notes={olderNotes}
+            selectedNoteId={selectedNoteId}
+            onSelectNote={onSelectNote}
+          />
         )}
       </>
-    )
-  }
+    );
+  };
 
   const renderFlatView = () => {
     return notes.map((note) => (
@@ -136,20 +149,20 @@ export function NotesTree({
         isSelected={note.id === selectedNoteId}
         onSelect={() => onSelectNote(note.id)}
       />
-    ))
-  }
+    ));
+  };
 
   const renderSearchResults = () => {
-    const displayedResults = searchResults.slice(0, displayCount)
-    const hasMore = displayCount < searchResults.length
+    const displayedResults = searchResults.slice(0, displayCount);
+    const hasMore = displayCount < searchResults.length;
 
     const handleLoadMore = () => {
-      setIsLoadingMore(true)
+      setIsLoadingMore(true);
       setTimeout(() => {
-        setDisplayCount((prev) => prev + 20)
-        setIsLoadingMore(false)
-      }, 500)
-    }
+        setDisplayCount((prev) => prev + 20);
+        setIsLoadingMore(false);
+      }, 500);
+    };
 
     return (
       <div className="space-y-2">
@@ -190,8 +203,8 @@ export function NotesTree({
           </div>
         )}
       </div>
-    )
-  }
+    );
+  };
 
   return (
     <div className="w-64 border-r border-border bg-card flex flex-col h-screen">
@@ -211,7 +224,7 @@ export function NotesTree({
                 "flex-1 h-9 text-xs rounded-none border-r border-b-2 transition-all",
                 viewMode === "category"
                   ? "border-b-primary/80 border-r-border bg-accent text-foreground border-b-[3px]"
-                  : "border-b-transparent border-r-border hover:bg-muted/50",
+                  : "border-b-transparent border-r-border hover:bg-muted/50"
               )}
             >
               <FolderTree className="h-3.5 w-3.5 mr-1" />
@@ -225,7 +238,7 @@ export function NotesTree({
                 "flex-1 h-9 text-xs rounded-none border-r border-b-2 transition-all",
                 viewMode === "time"
                   ? "border-b-primary/80 border-r-border bg-accent text-foreground border-b-[3px]"
-                  : "border-b-transparent border-r-border hover:bg-muted/50",
+                  : "border-b-transparent border-r-border hover:bg-muted/50"
               )}
             >
               <Calendar className="h-3.5 w-3.5 mr-1" />
@@ -239,7 +252,7 @@ export function NotesTree({
                 "flex-1 h-9 text-xs rounded-none border-b-2 transition-all",
                 viewMode === "flat"
                   ? "border-b-primary/80 bg-accent text-foreground border-b-[3px]"
-                  : "border-b-transparent hover:bg-muted/50",
+                  : "border-b-transparent hover:bg-muted/50"
               )}
             >
               <List className="h-3.5 w-3.5 mr-1" />
@@ -276,7 +289,7 @@ export function NotesTree({
 
       {isAboutOpen && <AboutDialog onClose={() => setIsAboutOpen(false)} />}
     </div>
-  )
+  );
 }
 
 function TimeGroup({
@@ -285,12 +298,12 @@ function TimeGroup({
   selectedNoteId,
   onSelectNote,
 }: {
-  title: string
-  notes: Note[]
-  selectedNoteId: string | null
-  onSelectNote: (noteId: string) => void
+  title: string;
+  notes: Note[];
+  selectedNoteId: string | null;
+  onSelectNote: (noteId: string) => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(true)
+  const [isExpanded, setIsExpanded] = useState(true);
 
   return (
     <div className="mb-1">
@@ -319,7 +332,7 @@ function TimeGroup({
         </div>
       )}
     </div>
-  )
+  );
 }
 
 function NoteItem({
@@ -327,22 +340,24 @@ function NoteItem({
   isSelected,
   onSelect,
 }: {
-  note: Note
-  isSelected: boolean
-  onSelect: () => void
+  note: Note;
+  isSelected: boolean;
+  onSelect: () => void;
 }) {
   return (
     <button
       onClick={onSelect}
       className={cn(
         "flex w-full items-center justify-between rounded-md px-2 py-1.5 text-sm transition-colors",
-        isSelected ? "bg-primary/10 text-primary" : "hover:bg-muted text-foreground",
+        isSelected ? "bg-primary/10 text-primary" : "hover:bg-muted text-foreground"
       )}
     >
       <span className="truncate flex-1 text-left text-sm">{note.title}</span>
-      <span className="ml-2 text-xs text-muted-foreground shrink-0">{format(note.updatedAt, "MMM d")}</span>
+      <span className="ml-2 text-xs text-muted-foreground shrink-0">
+        {format(note.updatedAt, "MMM d")}
+      </span>
     </button>
-  )
+  );
 }
 
 function SearchResultCard({
@@ -350,23 +365,27 @@ function SearchResultCard({
   isSelected,
   onSelect,
 }: {
-  note: Note
-  isSelected: boolean
-  onSelect: () => void
+  note: Note;
+  isSelected: boolean;
+  onSelect: () => void;
 }) {
-  const excerpt = note.content.slice(0, 100).trim() + (note.content.length > 100 ? "..." : "")
+  const excerpt = note.content.slice(0, 100).trim() + (note.content.length > 100 ? "..." : "");
 
   return (
     <button
       onClick={onSelect}
       className={cn(
         "flex flex-col w-full rounded-lg p-2.5 text-left transition-colors border",
-        isSelected ? "bg-primary/10 border-primary/20" : "bg-card border-border hover:bg-accent",
+        isSelected ? "bg-primary/10 border-primary/20" : "bg-card border-border hover:bg-accent"
       )}
     >
       <div className="font-medium text-sm text-foreground mb-1 line-clamp-1">{note.title}</div>
-      {excerpt && <div className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed">{excerpt}</div>}
+      {excerpt && (
+        <div className="text-xs text-muted-foreground mb-2 line-clamp-2 leading-relaxed">
+          {excerpt}
+        </div>
+      )}
       <div className="text-xs text-muted-foreground">{formatRelativeTime(note.updatedAt)}</div>
     </button>
-  )
+  );
 }

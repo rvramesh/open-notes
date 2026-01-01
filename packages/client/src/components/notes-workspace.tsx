@@ -1,32 +1,43 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { NotesTree } from "@/components/notes-tree"
-import { NoteEditor } from "@/components/note-editor"
-import { CommandPalette } from "@/components/command-palette"
-import { SettingsDialog } from "@/components/settings-dialog"
-import type { Note, Tag, Category } from "@/lib/types"
+import { CommandPalette } from "@/components/command-palette";
+import { NoteEditor } from "@/components/note-editor";
+import { NotesTree } from "@/components/notes-tree";
+import { SettingsDialog } from "@/components/settings-dialog";
+import type { Category, Note, Tag } from "@/lib/types";
+import { useState } from "react";
 
 // Mock data
 const mockCategories: Category[] = [
-  { id: "1", name: "Personal", color: "rose", aiPrompt: "Enhance this personal note with insights." },
+  {
+    id: "1",
+    name: "Personal",
+    color: "rose",
+    aiPrompt: "Enhance this personal note with insights.",
+  },
   { id: "2", name: "Work", color: "blue", aiPrompt: "Summarize work-related tasks." },
   { id: "3", name: "Ideas", color: "purple", aiPrompt: "Expand on creative ideas." },
-  { id: "4", name: "Research", color: "green", aiPrompt: "Provide research context and connections." },
-]
+  {
+    id: "4",
+    name: "Research",
+    color: "green",
+    aiPrompt: "Provide research context and connections.",
+  },
+];
 
 const mockTags: Tag[] = [
   { id: "1", name: "Urgent", color: "rose" },
   { id: "2", name: "Planning", color: "blue" },
   { id: "3", name: "Creative", color: "purple" },
   { id: "4", name: "Technical", color: "green" },
-]
+];
 
 const mockNotes: Note[] = [
   {
     id: "1",
     title: "Meeting Notes - Q1 Planning",
-    content: "Discussed quarterly goals and team objectives. Need to follow up on budget allocation.",
+    content:
+      "Discussed quarterly goals and team objectives. Need to follow up on budget allocation.",
     categoryIds: ["2"],
     tagIds: ["1", "2"],
     createdAt: new Date("2024-01-15"),
@@ -41,31 +52,35 @@ const mockNotes: Note[] = [
     createdAt: new Date("2024-01-14"),
     updatedAt: new Date("2024-01-16"),
   },
-]
+];
 
 export function NotesWorkspace() {
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(mockNotes[0]?.id || null)
-  const [notes, setNotes] = useState<Note[]>(mockNotes)
-  const [tags, setTags] = useState<Tag[]>(mockTags)
-  const [categories, setCategories] = useState<Category[]>(mockCategories)
-  const [isLeftBarCollapsed, setIsLeftBarCollapsed] = useState(false)
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [settingsPreSelect, setSettingsPreSelect] = useState<"ai" | "categories" | undefined>(undefined)
-  const [settingsPreFillCategory, setSettingsPreFillCategory] = useState<string | undefined>(undefined)
-  const [searchQuery, setSearchQuery] = useState("")
-  const [searchResults, setSearchResults] = useState<Note[]>([])
-  const [isSearchActive, setIsSearchActive] = useState(false)
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(mockNotes[0]?.id || null);
+  const [notes, setNotes] = useState<Note[]>(mockNotes);
+  const [tags, setTags] = useState<Tag[]>(mockTags);
+  const [categories, setCategories] = useState<Category[]>(mockCategories);
+  const [isLeftBarCollapsed, setIsLeftBarCollapsed] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsPreSelect, setSettingsPreSelect] = useState<"ai" | "categories" | undefined>(
+    undefined
+  );
+  const [settingsPreFillCategory, setSettingsPreFillCategory] = useState<string | undefined>(
+    undefined
+  );
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<Note[]>([]);
+  const [isSearchActive, setIsSearchActive] = useState(false);
 
-  const selectedNote = notes.find((note) => note.id === selectedNoteId) || null
+  const selectedNote = notes.find((note) => note.id === selectedNoteId) || null;
 
   const handleUpdateNote = (updatedNote: Note) => {
-    setNotes((prev) => prev.map((note) => (note.id === updatedNote.id ? updatedNote : note)))
-  }
+    setNotes((prev) => prev.map((note) => (note.id === updatedNote.id ? updatedNote : note)));
+  };
 
   const handleCreateNote = () => {
     // Save current note first
     if (selectedNote) {
-      handleUpdateNote(selectedNote)
+      handleUpdateNote(selectedNote);
     }
 
     // Create new note
@@ -77,95 +92,95 @@ export function NotesWorkspace() {
       tagIds: [],
       createdAt: new Date(),
       updatedAt: new Date(),
-    }
-    setNotes((prev) => [newNote, ...prev])
-    setSelectedNoteId(newNote.id)
-  }
+    };
+    setNotes((prev) => [newNote, ...prev]);
+    setSelectedNoteId(newNote.id);
+  };
 
   const handleRemoveTag = (tagId: string) => {
-    setTags((prev) => prev.filter((tag) => tag.id !== tagId))
+    setTags((prev) => prev.filter((tag) => tag.id !== tagId));
     // Remove tag from all notes
     setNotes((prev) =>
       prev.map((note) => ({
         ...note,
         tagIds: note.tagIds.filter((id) => id !== tagId),
-      })),
-    )
-  }
+      }))
+    );
+  };
 
   const handleRemoveCategory = (categoryId: string) => {
-    setCategories((prev) => prev.filter((cat) => cat.id !== categoryId))
+    setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
     // Remove category from all notes
     setNotes((prev) =>
       prev.map((note) => ({
         ...note,
         categoryIds: note.categoryIds.filter((id) => id !== categoryId),
-      })),
-    )
-  }
+      }))
+    );
+  };
 
   const handleDeleteNote = (noteId: string) => {
-    setNotes((prev) => prev.filter((note) => note.id !== noteId))
+    setNotes((prev) => prev.filter((note) => note.id !== noteId));
     // Select another note if the deleted one was selected
     if (selectedNoteId === noteId) {
-      const remainingNotes = notes.filter((note) => note.id !== noteId)
-      setSelectedNoteId(remainingNotes[0]?.id || null)
+      const remainingNotes = notes.filter((note) => note.id !== noteId);
+      setSelectedNoteId(remainingNotes[0]?.id || null);
     }
-  }
+  };
 
   const handleOpenSettingsWithCategory = (categoryName: string) => {
-    setSettingsPreSelect("categories")
-    setSettingsPreFillCategory(categoryName)
-    setIsSettingsOpen(true)
-  }
+    setSettingsPreSelect("categories");
+    setSettingsPreFillCategory(categoryName);
+    setIsSettingsOpen(true);
+  };
 
   const handleCloseSettings = () => {
-    setIsSettingsOpen(false)
-    setSettingsPreSelect(undefined)
-    setSettingsPreFillCategory(undefined)
-  }
+    setIsSettingsOpen(false);
+    setSettingsPreSelect(undefined);
+    setSettingsPreFillCategory(undefined);
+  };
 
   const handleSearch = (query: string) => {
-    setSearchQuery(query)
+    setSearchQuery(query);
     if (query.trim()) {
       const results = notes.filter(
         (note) =>
           note.title.toLowerCase().includes(query.toLowerCase()) ||
-          note.content.toLowerCase().includes(query.toLowerCase()),
-      )
-      setSearchResults(results)
-      setIsSearchActive(true)
+          note.content.toLowerCase().includes(query.toLowerCase())
+      );
+      setSearchResults(results);
+      setIsSearchActive(true);
     } else {
-      setSearchResults([])
-      setIsSearchActive(false)
+      setSearchResults([]);
+      setIsSearchActive(false);
     }
-  }
+  };
 
   const handleSearchByCategory = (categoryId: string) => {
-    const category = categories.find((cat) => cat.id === categoryId)
+    const category = categories.find((cat) => cat.id === categoryId);
     if (category) {
-      const results = notes.filter((note) => note.categoryIds.includes(categoryId))
-      setSearchQuery(`Category: ${category.name}`)
-      setSearchResults(results)
-      setIsSearchActive(true)
+      const results = notes.filter((note) => note.categoryIds.includes(categoryId));
+      setSearchQuery(`Category: ${category.name}`);
+      setSearchResults(results);
+      setIsSearchActive(true);
     }
-  }
+  };
 
   const handleSearchByTag = (tagId: string) => {
-    const tag = tags.find((t) => t.id === tagId)
+    const tag = tags.find((t) => t.id === tagId);
     if (tag) {
-      const results = notes.filter((note) => note.tagIds.includes(tagId))
-      setSearchQuery(`Tag: ${tag.name}`)
-      setSearchResults(results)
-      setIsSearchActive(true)
+      const results = notes.filter((note) => note.tagIds.includes(tagId));
+      setSearchQuery(`Tag: ${tag.name}`);
+      setSearchResults(results);
+      setIsSearchActive(true);
     }
-  }
+  };
 
   const handleClearSearch = () => {
-    setSearchQuery("")
-    setSearchResults([])
-    setIsSearchActive(false)
-  }
+    setSearchQuery("");
+    setSearchResults([]);
+    setIsSearchActive(false);
+  };
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -220,5 +235,5 @@ export function NotesWorkspace() {
         preFillCategoryName={settingsPreFillCategory}
       />
     </div>
-  )
+  );
 }

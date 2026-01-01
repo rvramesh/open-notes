@@ -2,6 +2,7 @@
   "name": "open-notes",
   "private": true,
   "version": "0.0.0",
+  "license": "MIT",
   "type": "module",
   "workspaces": [
     "packages/client",
@@ -13,10 +14,16 @@
     "build": "npm run build -w packages/client",
     "build:all": "concurrently \"npm run build -w packages/client\" \"npm run build -w packages/electron\" \"npm run build -w packages/server\"",
     "lint": "npm run lint -w packages/client",
-    "preview": "npm run preview -w packages/client"
+    "preview": "npm run preview -w packages/client",
+    "check-licenses": "node scripts/check-licenses.cjs",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,css,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md,css,yml,yaml}\"",
+    "postinstall": "node scripts/check-licenses.cjs"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
+    "prettier": "^3.2.5",
+    "prettier-plugin-organize-imports": "^3.2.4",
     "typescript": "^5.2.2"
   }
 }

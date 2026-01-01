@@ -1,23 +1,34 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Button } from "@/components/ui/button"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import type { Category } from "@/lib/types"
-import { Trash2, Settings, FolderTree } from "lucide-react"
-import { cn } from "@/lib/utils"
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import type { Category } from "@/lib/types";
+import { cn } from "@/lib/utils";
+import { FolderTree, Settings, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface SettingsDialogProps {
-  isOpen: boolean
-  onClose: () => void
-  categories: Category[]
-  onUpdateCategories: (categories: Category[]) => void
-  preSelectTab?: "ai" | "categories"
-  preFillCategoryName?: string
+  isOpen: boolean;
+  onClose: () => void;
+  categories: Category[];
+  onUpdateCategories: (categories: Category[]) => void;
+  preSelectTab?: "ai" | "categories";
+  preFillCategoryName?: string;
 }
 
 export function SettingsDialog({
@@ -28,16 +39,16 @@ export function SettingsDialog({
   preSelectTab,
   preFillCategoryName,
 }: SettingsDialogProps) {
-  const [apiEndpoint, setApiEndpoint] = useState("https://api.openai.com/v1")
-  const [apiKey, setApiKey] = useState("")
-  const [editingCategories, setEditingCategories] = useState(categories)
-  const [activeTab, setActiveTab] = useState<"ai" | "categories">("ai")
+  const [apiEndpoint, setApiEndpoint] = useState("https://api.openai.com/v1");
+  const [apiKey, setApiKey] = useState("");
+  const [editingCategories, setEditingCategories] = useState(categories);
+  const [activeTab, setActiveTab] = useState<"ai" | "categories">("ai");
 
   useEffect(() => {
     if (isOpen) {
-      setEditingCategories(categories)
+      setEditingCategories(categories);
       if (preSelectTab) {
-        setActiveTab(preSelectTab)
+        setActiveTab(preSelectTab);
       }
       if (preFillCategoryName && preSelectTab === "categories") {
         // Add new category with pre-filled name
@@ -46,24 +57,26 @@ export function SettingsDialog({
           name: preFillCategoryName,
           color: "blue",
           aiPrompt: "",
-        }
-        setEditingCategories((prev) => [...prev, newCategory])
+        };
+        setEditingCategories((prev) => [...prev, newCategory]);
       }
     }
-  }, [isOpen, categories, preSelectTab, preFillCategoryName])
+  }, [isOpen, categories, preSelectTab, preFillCategoryName]);
 
   const handleSaveCategories = () => {
-    onUpdateCategories(editingCategories)
-    onClose()
-  }
+    onUpdateCategories(editingCategories);
+    onClose();
+  };
 
   const handleUpdateCategory = (id: string, field: keyof Category, value: string) => {
-    setEditingCategories((prev) => prev.map((cat) => (cat.id === id ? { ...cat, [field]: value } : cat)))
-  }
+    setEditingCategories((prev) =>
+      prev.map((cat) => (cat.id === id ? { ...cat, [field]: value } : cat))
+    );
+  };
 
   const handleDeleteCategory = (id: string) => {
-    setEditingCategories((prev) => prev.filter((cat) => cat.id !== id))
-  }
+    setEditingCategories((prev) => prev.filter((cat) => cat.id !== id));
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -81,7 +94,7 @@ export function SettingsDialog({
                 "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 activeTab === "ai"
                   ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
               )}
             >
               <Settings className="h-4 w-4" />
@@ -93,7 +106,7 @@ export function SettingsDialog({
                 "w-full flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                 activeTab === "categories"
                   ? "bg-background text-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground"
               )}
             >
               <FolderTree className="h-4 w-4" />
@@ -112,7 +125,9 @@ export function SettingsDialog({
                     onChange={(e) => setApiEndpoint(e.target.value)}
                     placeholder="https://api.openai.com/v1"
                   />
-                  <p className="text-xs text-muted-foreground">Enter your AI service endpoint URL</p>
+                  <p className="text-xs text-muted-foreground">
+                    Enter your AI service endpoint URL
+                  </p>
                 </div>
 
                 <div className="space-y-2">
@@ -124,7 +139,9 @@ export function SettingsDialog({
                     onChange={(e) => setApiKey(e.target.value)}
                     placeholder="sk-..."
                   />
-                  <p className="text-xs text-muted-foreground">Your API key will be stored securely</p>
+                  <p className="text-xs text-muted-foreground">
+                    Your API key will be stored securely
+                  </p>
                 </div>
 
                 <Button onClick={onClose} className="w-full">
@@ -135,19 +152,30 @@ export function SettingsDialog({
 
             {activeTab === "categories" && (
               <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">Configure categories and their AI enrichment prompts</p>
+                <p className="text-sm text-muted-foreground">
+                  Configure categories and their AI enrichment prompts
+                </p>
 
                 <div className="space-y-4">
                   {editingCategories.map((category) => (
-                    <div key={category.id} className="p-4 border border-border rounded-lg space-y-3">
+                    <div
+                      key={category.id}
+                      className="p-4 border border-border rounded-lg space-y-3"
+                    >
                       <div className="flex items-center justify-between">
                         <Input
                           value={category.name}
-                          onChange={(e) => handleUpdateCategory(category.id, "name", e.target.value)}
+                          onChange={(e) =>
+                            handleUpdateCategory(category.id, "name", e.target.value)
+                          }
                           className="flex-1 mr-2"
                           placeholder="Category name"
                         />
-                        <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteCategory(category.id)}
+                        >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
@@ -159,7 +187,9 @@ export function SettingsDialog({
                         <Textarea
                           id={`prompt-${category.id}`}
                           value={category.aiPrompt}
-                          onChange={(e) => handleUpdateCategory(category.id, "aiPrompt", e.target.value)}
+                          onChange={(e) =>
+                            handleUpdateCategory(category.id, "aiPrompt", e.target.value)
+                          }
                           placeholder="Enter custom prompt for AI enrichment..."
                           className="min-h-[80px] text-sm"
                         />
@@ -196,7 +226,9 @@ export function SettingsDialog({
                       onChange={(e) => setApiEndpoint(e.target.value)}
                       placeholder="https://api.openai.com/v1"
                     />
-                    <p className="text-xs text-muted-foreground">Enter your AI service endpoint URL</p>
+                    <p className="text-xs text-muted-foreground">
+                      Enter your AI service endpoint URL
+                    </p>
                   </div>
 
                   <div className="space-y-2">
@@ -208,7 +240,9 @@ export function SettingsDialog({
                       onChange={(e) => setApiKey(e.target.value)}
                       placeholder="sk-..."
                     />
-                    <p className="text-xs text-muted-foreground">Your API key will be stored securely</p>
+                    <p className="text-xs text-muted-foreground">
+                      Your API key will be stored securely
+                    </p>
                   </div>
 
                   <Button onClick={onClose} className="w-full">
@@ -227,19 +261,30 @@ export function SettingsDialog({
               </AccordionTrigger>
               <AccordionContent>
                 <div className="space-y-4 pt-2">
-                  <p className="text-sm text-muted-foreground">Configure categories and their AI enrichment prompts</p>
+                  <p className="text-sm text-muted-foreground">
+                    Configure categories and their AI enrichment prompts
+                  </p>
 
                   <div className="space-y-4">
                     {editingCategories.map((category) => (
-                      <div key={category.id} className="p-3 border border-border rounded-lg space-y-3">
+                      <div
+                        key={category.id}
+                        className="p-3 border border-border rounded-lg space-y-3"
+                      >
                         <div className="flex items-center justify-between">
                           <Input
                             value={category.name}
-                            onChange={(e) => handleUpdateCategory(category.id, "name", e.target.value)}
+                            onChange={(e) =>
+                              handleUpdateCategory(category.id, "name", e.target.value)
+                            }
                             className="flex-1 mr-2 text-sm"
                             placeholder="Category name"
                           />
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteCategory(category.id)}>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteCategory(category.id)}
+                          >
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         </div>
@@ -251,7 +296,9 @@ export function SettingsDialog({
                           <Textarea
                             id={`prompt-mobile-${category.id}`}
                             value={category.aiPrompt}
-                            onChange={(e) => handleUpdateCategory(category.id, "aiPrompt", e.target.value)}
+                            onChange={(e) =>
+                              handleUpdateCategory(category.id, "aiPrompt", e.target.value)
+                            }
                             placeholder="Enter custom prompt for AI enrichment..."
                             className="min-h-[80px] text-sm"
                           />
@@ -270,5 +317,5 @@ export function SettingsDialog({
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

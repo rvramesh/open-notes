@@ -17,12 +17,15 @@ open-notes/
 ## Packages
 
 ### Client (`packages/client`)
+
 The frontend application built with React, TypeScript, and Vite.
+
 - React 18 with TypeScript
 - Vite for fast development and building
 - Electron integration for desktop app
 
 **Commands:**
+
 ```bash
 npm run dev -w packages/client      # Start dev server
 npm run build -w packages/client    # Build for production
@@ -31,23 +34,29 @@ npm run preview -w packages/client  # Preview build
 ```
 
 ### Electron (`packages/electron`)
+
 The Electron main process and preload scripts.
+
 - Electron main process entry point
 - IPC communication bridge via preload
 - Native desktop app features
 
 **Commands:**
+
 ```bash
 npm run build -w packages/electron  # Compile TypeScript
 ```
 
 ### Server (`packages/server`)
+
 Backend server (Node.js + Express or similar).
+
 - Backend API
 - Database integration
 - Business logic
 
 **Commands:**
+
 ```bash
 npm run dev -w packages/server      # Start development server
 npm run build -w packages/server    # Build for production
@@ -56,6 +65,7 @@ npm run build -w packages/server    # Build for production
 ## Getting Started
 
 ### Installation
+
 ```bash
 npm install
 ```
@@ -63,6 +73,7 @@ npm install
 This will install all dependencies for all workspaces.
 
 ### Development
+
 ```bash
 npm run dev
 ```
@@ -70,6 +81,7 @@ npm run dev
 This runs the client workspace in development mode with Vite.
 
 ### Building
+
 ```bash
 npm run build
 ```
@@ -77,6 +89,7 @@ npm run build
 This builds the client and Electron app for distribution.
 
 ### Linting
+
 ```bash
 npm run lint
 ```
@@ -86,14 +99,17 @@ This runs ESLint on the client workspace.
 ## Workspaces
 
 This project uses npm workspaces to manage multiple packages. Benefits include:
+
 - Shared dependencies at the root level
 - Easy cross-workspace references
 - Simplified dependency management
 
 ### Root Dependencies
+
 - TypeScript (shared across all workspaces)
 
 ### Workspace-specific Dependencies
+
 Each workspace has its own `package.json` with specific dependencies.
 
 ## Monorepo Scripts
@@ -111,9 +127,11 @@ npm run preview      # Preview built app
 ### Build Script Details
 
 **`npm run dev`** - Starts the client in development mode with Vite's hot module reloading
+
 - Runs: `npm run dev -w packages/client`
 
 **`npm run build`** - Full production build with electron packaging
+
 - Compiles TypeScript files
 - Builds electron process (`packages/electron`)
 - Bundles client with Vite
@@ -121,13 +139,16 @@ npm run preview      # Preview built app
 - Runs: `tsc && npm run build -w packages/electron && vite build && electron-builder`
 
 **`npm run build:all`** - Builds all packages concurrently (useful for CI/CD)
+
 - Uses `concurrently` to run builds in parallel
 - Builds client, electron, and server packages simultaneously
 
 **`npm run lint`** - Runs ESLint on the client workspace
+
 - Checks TypeScript and TSX files
 
 **`npm run preview`** - Preview the built application
+
 - Shows the production build locally before distribution
 
 ## Configuration Files

@@ -1,20 +1,18 @@
-import React from 'react'
-import ReactDOM from 'react-dom/client'
-import App from './app'
-import RootLayout from './app/layout'
+import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./app";
+import RootLayout from "./app/layout";
 
-ReactDOM.createRoot(document.getElementById('root')!).render(
+ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <RootLayout>
       <App />
     </RootLayout>
-  </React.StrictMode>,
-)
-
+  </React.StrictMode>
+);
 
 // Use contextBridge
 // @ts-expect-error
-window.ipcRenderer.on('main-process-message', (_event, message) => {
-  console.log(message)
-})
-
+window.ipcRenderer.on("main-process-message", (_event, message) => {
+  console.log(message);
+});

@@ -1,22 +1,6 @@
-"use client"
+"use client";
 
-import type React from "react"
-import { useState, useEffect, useMemo, useRef } from "react"
-import { Loader2, Check, Plus, X, Sparkles, FileText, MoreVertical, Download, Trash2 } from "lucide-react"
-import type { Note, Tag, Category } from "@/lib/types"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { cn } from "@/lib/utils"
-import { formatRelativeTime } from "@/lib/utils"
-import { LexicalEditor } from "@/components/lexical-editor"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { LexicalEditor } from "@/components/lexical-editor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,30 +10,56 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import type { Category, Note, Tag } from "@/lib/types";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import {
+  Check,
+  Download,
+  FileText,
+  Loader2,
+  MoreVertical,
+  Plus,
+  Sparkles,
+  Trash2,
+  X,
+} from "lucide-react";
+import type React from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 interface NoteEditorProps {
-  note: Note | null
-  tags: Tag[]
-  categories: Category[]
-  onUpdateNote: (note: Note) => void
-  onAddTag: (tag: Tag) => void
-  onAddCategory: (category: Category) => void
-  onRemoveTag: (tagId: string) => void
-  onRemoveCategory: (categoryId: string) => void
-  onOpenSettingsWithCategory?: (categoryName: string) => void
-  onSearchByCategory?: (categoryId: string) => void
-  onSearchByTag?: (tagId: string) => void
-  onDeleteNote?: (noteId: string) => void
+  note: Note | null;
+  tags: Tag[];
+  categories: Category[];
+  onUpdateNote: (note: Note) => void;
+  onAddTag: (tag: Tag) => void;
+  onAddCategory: (category: Category) => void;
+  onRemoveTag: (tagId: string) => void;
+  onRemoveCategory: (categoryId: string) => void;
+  onOpenSettingsWithCategory?: (categoryName: string) => void;
+  onSearchByCategory?: (categoryId: string) => void;
+  onSearchByTag?: (tagId: string) => void;
+  onDeleteNote?: (noteId: string) => void;
 }
 
 const tagColorClasses = {
   rose: "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/30 dark:text-rose-300",
   blue: "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950/30 dark:text-blue-300",
-  purple: "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-950/30 dark:text-purple-300",
+  purple:
+    "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-950/30 dark:text-purple-300",
   green: "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-950/30 dark:text-green-300",
   amber: "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950/30 dark:text-amber-300",
-}
+};
 
 export function NoteEditor({
   note,
@@ -65,105 +75,115 @@ export function NoteEditor({
   onSearchByTag,
   onDeleteNote,
 }: NoteEditorProps) {
-  const [title, setTitle] = useState("")
-  const [content, setContent] = useState("")
-  const [isSaving, setIsSaving] = useState(false)
-  const [isSaved, setIsSaved] = useState(true)
-  const [isTyping, setIsTyping] = useState(false)
-  const [showEnriched, setShowEnriched] = useState(false)
-  const [isAddingTag, setIsAddingTag] = useState(false)
-  const [isAddingCategory, setIsAddingCategory] = useState(false)
-  const [newTagName, setNewTagName] = useState("")
-  const [newCategoryName, setNewCategoryName] = useState("")
-  const [tagFilter, setTagFilter] = useState("")
-  const [categoryFilter, setCategoryFilter] = useState("")
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSaved, setIsSaved] = useState(true);
+  const [isTyping, setIsTyping] = useState(false);
+  const [showEnriched, setShowEnriched] = useState(false);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [newTagName, setNewTagName] = useState("");
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [tagFilter, setTagFilter] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const [hasChanges, setHasChanges] = useState(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const [hasChanges, setHasChanges] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (note) {
-      setTitle(note.title)
-      setContent(note.content)
-      setHasChanges(false)
-      setIsSaved(true)
-      setIsTyping(false)
+      setTitle(note.title);
+      setContent(note.content);
+      setHasChanges(false);
+      setIsSaved(true);
+      setIsTyping(false);
     }
-  }, [note])
+  }, [note]);
 
   useEffect(() => {
-    if (!note) return
-    if (!hasChanges) return
+    if (!note) return;
+    if (!hasChanges) return;
 
     if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current)
+      clearTimeout(saveTimeoutRef.current);
     }
 
-    setIsTyping(true)
-    setIsSaving(false)
-    setIsSaved(false)
+    setIsTyping(true);
+    setIsSaving(false);
+    setIsSaved(false);
 
     saveTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false)
-      setIsSaving(true)
+      setIsTyping(false);
+      setIsSaving(true);
 
       onUpdateNote({
         ...note,
         title,
         content,
         updatedAt: new Date(),
-      })
+      });
 
-      setIsSaving(false)
-      setIsSaved(true)
-      setHasChanges(false)
+      setIsSaving(false);
+      setIsSaved(true);
+      setHasChanges(false);
 
-      setTimeout(() => setIsSaved(false), 2000)
-    }, 1000)
+      setTimeout(() => setIsSaved(false), 2000);
+    }, 1000);
 
     return () => {
       if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current)
+        clearTimeout(saveTimeoutRef.current);
       }
-    }
-  }, [title, content, note, onUpdateNote, hasChanges])
+    };
+  }, [title, content, note, onUpdateNote, hasChanges]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setTitle(e.target.value)
-    setHasChanges(true)
-  }
+    setTitle(e.target.value);
+    setHasChanges(true);
+  };
 
   const handleContentChange = (newContent: string) => {
-    setContent(newContent)
-    setHasChanges(true)
-  }
+    setContent(newContent);
+    setHasChanges(true);
+  };
 
   const handleToggleTag = (tagId: string) => {
-    if (!note) return
-    const newTagIds = note.tagIds.includes(tagId) ? note.tagIds.filter((id) => id !== tagId) : [...note.tagIds, tagId]
-    onUpdateNote({ ...note, tagIds: newTagIds, updatedAt: new Date() })
-  }
+    if (!note) return;
+    const newTagIds = note.tagIds.includes(tagId)
+      ? note.tagIds.filter((id) => id !== tagId)
+      : [...note.tagIds, tagId];
+    onUpdateNote({ ...note, tagIds: newTagIds, updatedAt: new Date() });
+  };
 
   const handleToggleCategory = (categoryId: string) => {
-    if (!note) return
+    if (!note) return;
     const newCategoryIds = note.categoryIds.includes(categoryId)
       ? note.categoryIds.filter((id) => id !== categoryId)
-      : [...note.categoryIds, categoryId]
-    onUpdateNote({ ...note, categoryIds: newCategoryIds, updatedAt: new Date() })
-  }
+      : [...note.categoryIds, categoryId];
+    onUpdateNote({ ...note, categoryIds: newCategoryIds, updatedAt: new Date() });
+  };
 
   const handleRemoveTag = (tagId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!note) return
-    onUpdateNote({ ...note, tagIds: note.tagIds.filter((id) => id !== tagId), updatedAt: new Date() })
-  }
+    e.stopPropagation();
+    if (!note) return;
+    onUpdateNote({
+      ...note,
+      tagIds: note.tagIds.filter((id) => id !== tagId),
+      updatedAt: new Date(),
+    });
+  };
 
   const handleRemoveCategory = (categoryId: string, e: React.MouseEvent) => {
-    e.stopPropagation()
-    if (!note) return
-    onUpdateNote({ ...note, categoryIds: note.categoryIds.filter((id) => id !== categoryId), updatedAt: new Date() })
-  }
+    e.stopPropagation();
+    if (!note) return;
+    onUpdateNote({
+      ...note,
+      categoryIds: note.categoryIds.filter((id) => id !== categoryId),
+      updatedAt: new Date(),
+    });
+  };
 
   const handleAddTag = () => {
     if (tagFilter.trim()) {
@@ -171,74 +191,78 @@ export function NoteEditor({
         id: Date.now().toString(),
         name: tagFilter.trim(),
         color: "blue",
-      }
-      onAddTag(newTag)
+      };
+      onAddTag(newTag);
       if (note) {
-        onUpdateNote({ ...note, tagIds: [...note.tagIds, newTag.id], updatedAt: new Date() })
+        onUpdateNote({ ...note, tagIds: [...note.tagIds, newTag.id], updatedAt: new Date() });
       }
-      setTagFilter("")
-      setIsAddingTag(false)
+      setTagFilter("");
+      setIsAddingTag(false);
     }
-  }
+  };
 
   const handleAddCategoryViaSettings = () => {
     if (categoryFilter.trim() && onOpenSettingsWithCategory) {
-      onOpenSettingsWithCategory(categoryFilter.trim())
-      setIsAddingCategory(false)
-      setCategoryFilter("")
+      onOpenSettingsWithCategory(categoryFilter.trim());
+      setIsAddingCategory(false);
+      setCategoryFilter("");
     }
-  }
+  };
 
   const filteredTags = useMemo(() => {
-    if (!tagFilter.trim()) return tags.filter((tag) => !note?.tagIds.includes(tag.id))
+    if (!tagFilter.trim()) return tags.filter((tag) => !note?.tagIds.includes(tag.id));
     return tags.filter(
-      (tag) => !note?.tagIds.includes(tag.id) && tag.name.toLowerCase().includes(tagFilter.toLowerCase()),
-    )
-  }, [tags, tagFilter, note?.tagIds])
+      (tag) =>
+        !note?.tagIds.includes(tag.id) && tag.name.toLowerCase().includes(tagFilter.toLowerCase())
+    );
+  }, [tags, tagFilter, note?.tagIds]);
 
   const filteredCategories = useMemo(() => {
-    if (!categoryFilter.trim()) return categories.filter((cat) => !note?.categoryIds.includes(cat.id))
+    if (!categoryFilter.trim())
+      return categories.filter((cat) => !note?.categoryIds.includes(cat.id));
     return categories.filter(
-      (cat) => !note?.categoryIds.includes(cat.id) && cat.name.toLowerCase().includes(categoryFilter.toLowerCase()),
-    )
-  }, [categories, categoryFilter, note?.categoryIds])
+      (cat) =>
+        !note?.categoryIds.includes(cat.id) &&
+        cat.name.toLowerCase().includes(categoryFilter.toLowerCase())
+    );
+  }, [categories, categoryFilter, note?.categoryIds]);
 
   const handleCategoryClick = (categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
-      onSearchByCategory(categoryId)
+      onSearchByCategory(categoryId);
     }
-  }
+  };
 
   const handleTagClick = (tagId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByTag) {
-      onSearchByTag(tagId)
+      onSearchByTag(tagId);
     }
-  }
+  };
 
   const handleExportPDF = () => {
-    if (!note) return
-    
+    if (!note) return;
+
     // Create a formatted text version of the note
-    const noteContent = `${note.title}\n\nCreated: ${note.createdAt.toLocaleDateString()}\nUpdated: ${note.updatedAt.toLocaleDateString()}\n\n${note.content}`
-    
+    const noteContent = `${note.title}\n\nCreated: ${note.createdAt.toLocaleDateString()}\nUpdated: ${note.updatedAt.toLocaleDateString()}\n\n${note.content}`;
+
     // Create a blob and download
-    const blob = new Blob([noteContent], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
+    const blob = new Blob([noteContent], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${note.title.replace(/[^a-z0-9]/gi, "_").toLowerCase()}.txt`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
 
   const handleDeleteNote = () => {
     if (note && onDeleteNote) {
-      onDeleteNote(note.id)
-      setIsDeleteDialogOpen(false)
+      onDeleteNote(note.id);
+      setIsDeleteDialogOpen(false);
     }
-  }
+  };
 
   if (!note) {
     return (
@@ -247,11 +271,11 @@ export function NoteEditor({
           <p className="text-muted-foreground text-sm">Select a note to view or edit</p>
         </div>
       </div>
-    )
+    );
   }
 
-  const noteTags = tags.filter((tag) => note.tagIds.includes(tag.id))
-  const noteCategories = categories.filter((cat) => note.categoryIds.includes(cat.id))
+  const noteTags = tags.filter((tag) => note.tagIds.includes(tag.id));
+  const noteCategories = categories.filter((cat) => note.categoryIds.includes(cat.id));
 
   return (
     <div className="flex-1 flex flex-col px-0 md:px-4 pb-3 min-h-0 notes-section">
@@ -303,7 +327,7 @@ export function NoteEditor({
                   "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   !showEnriched
                     ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <FileText className="h-3 w-3" />
@@ -315,13 +339,13 @@ export function NoteEditor({
                   "flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors",
                   showEnriched
                     ? "bg-accent text-foreground"
-                    : "text-muted-foreground hover:text-foreground hover:bg-muted",
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 )}
               >
                 <Sparkles className="h-3 w-3" />
                 <span>Enriched</span>
               </button>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
@@ -334,7 +358,7 @@ export function NoteEditor({
                     Export
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     onClick={() => setIsDeleteDialogOpen(true)}
                     className="text-destructive focus:text-destructive"
                   >
@@ -351,10 +375,12 @@ export function NoteEditor({
           {showEnriched ? (
             <div className="prose prose-sm max-w-none  p-4">
               <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 mb-4">
-                <h3 className="text-base font-semibold text-foreground mb-2">AI-Enhanced Summary</h3>
+                <h3 className="text-base font-semibold text-foreground mb-2">
+                  AI-Enhanced Summary
+                </h3>
                 <p className="text-foreground text-sm leading-relaxed">
-                  This note discusses important aspects related to {title.toLowerCase()}. The content provides valuable
-                  insights and actionable information.
+                  This note discusses important aspects related to {title.toLowerCase()}. The
+                  content provides valuable insights and actionable information.
                 </p>
               </div>
               <div className="space-y-3">
@@ -384,16 +410,16 @@ export function NoteEditor({
                   onClick={(e) => handleCategoryClick(category.id, e)}
                   className={cn(
                     "group px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1",
-                    tagColorClasses[category.color as keyof typeof tagColorClasses],
+                    tagColorClasses[category.color as keyof typeof tagColorClasses]
                   )}
                 >
                   {category.name}
                   <X
                     className="h-3 w-3 transition-opacity"
                     onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleRemoveCategory(category.id, e)
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveCategory(category.id, e);
                     }}
                   />
                 </button>
@@ -402,8 +428,8 @@ export function NoteEditor({
               <Popover
                 open={isAddingCategory}
                 onOpenChange={(open) => {
-                  setIsAddingCategory(open)
-                  if (!open) setCategoryFilter("")
+                  setIsAddingCategory(open);
+                  if (!open) setCategoryFilter("");
                 }}
               >
                 <PopoverTrigger asChild>
@@ -413,7 +439,9 @@ export function NoteEditor({
                 </PopoverTrigger>
                 <PopoverContent className="w-56 p-2" align="start">
                   <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">Add Category</div>
+                    <div className="text-xs font-medium text-muted-foreground mb-2">
+                      Add Category
+                    </div>
                     <Input
                       value={categoryFilter}
                       onChange={(e) => setCategoryFilter(e.target.value)}
@@ -427,9 +455,9 @@ export function NoteEditor({
                           <button
                             key={category.id}
                             onClick={() => {
-                              handleToggleCategory(category.id)
-                              setIsAddingCategory(false)
-                              setCategoryFilter("")
+                              handleToggleCategory(category.id);
+                              setIsAddingCategory(false);
+                              setCategoryFilter("");
                             }}
                             className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors"
                           >
@@ -445,7 +473,9 @@ export function NoteEditor({
                           Add Category "{categoryFilter}"
                         </button>
                       ) : (
-                        <p className="text-xs text-muted-foreground text-center py-2">Type to search or add</p>
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          Type to search or add
+                        </p>
                       )}
                     </div>
                   </div>
@@ -465,16 +495,16 @@ export function NoteEditor({
                   onClick={(e) => handleTagClick(tag.id, e)}
                   className={cn(
                     "group px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1",
-                    tagColorClasses[tag.color as keyof typeof tagColorClasses],
+                    tagColorClasses[tag.color as keyof typeof tagColorClasses]
                   )}
                 >
                   {tag.name}
                   <X
                     className="h-3 w-3 transition-opacity"
                     onClick={(e) => {
-                      e.preventDefault()
-                      e.stopPropagation()
-                      handleRemoveTag(tag.id, e)
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleRemoveTag(tag.id, e);
                     }}
                   />
                 </button>
@@ -483,8 +513,8 @@ export function NoteEditor({
               <Popover
                 open={isAddingTag}
                 onOpenChange={(open) => {
-                  setIsAddingTag(open)
-                  if (!open) setTagFilter("")
+                  setIsAddingTag(open);
+                  if (!open) setTagFilter("");
                 }}
               >
                 <PopoverTrigger asChild>
@@ -500,7 +530,7 @@ export function NoteEditor({
                       onChange={(e) => setTagFilter(e.target.value)}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" && tagFilter.trim() && filteredTags.length === 0) {
-                          handleAddTag()
+                          handleAddTag();
                         }
                       }}
                       placeholder="Search or add tag..."
@@ -513,9 +543,9 @@ export function NoteEditor({
                           <button
                             key={tag.id}
                             onClick={() => {
-                              handleToggleTag(tag.id)
-                              setIsAddingTag(false)
-                              setTagFilter("")
+                              handleToggleTag(tag.id);
+                              setIsAddingTag(false);
+                              setTagFilter("");
                             }}
                             className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors"
                           >
@@ -531,7 +561,9 @@ export function NoteEditor({
                           Add Tag "{tagFilter}"
                         </button>
                       ) : (
-                        <p className="text-xs text-muted-foreground text-center py-2">Type to search or add</p>
+                        <p className="text-xs text-muted-foreground text-center py-2">
+                          Type to search or add
+                        </p>
                       )}
                     </div>
                   </div>
@@ -547,7 +579,8 @@ export function NoteEditor({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Note</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete "{note.title}"? This action cannot be undone and the note will be permanently removed.
+              Are you sure you want to delete "{note.title}"? This action cannot be undone and the
+              note will be permanently removed.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -562,5 +595,5 @@ export function NoteEditor({
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  )
+  );
 }

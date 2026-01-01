@@ -1,24 +1,26 @@
-"use client"
+"use client";
 
-import { X } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface AboutDialogProps {
-  onClose: () => void
+  onClose: () => void;
 }
 
 export function AboutDialog({ onClose }: AboutDialogProps) {
   const libraries = [
     { name: "Next.js", version: "15.x", description: "React framework for production" },
-    { name: "React", version: "19.x", description: "JavaScript library for building user interfaces" },
+    {
+      name: "React",
+      version: "19.x",
+      description: "JavaScript library for building user interfaces",
+    },
     { name: "TypeScript", version: "5.x", description: "Typed superset of JavaScript" },
     { name: "Tailwind CSS", version: "4.x", description: "Utility-first CSS framework" },
     { name: "Lexical", version: "Latest", description: "Extensible text editor framework" },
     { name: "Radix UI", version: "Latest", description: "Unstyled, accessible UI components" },
     { name: "Lucide React", version: "Latest", description: "Beautiful & consistent icon toolkit" },
     { name: "date-fns", version: "Latest", description: "Modern JavaScript date utility library" },
-  ]
+  ];
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
@@ -45,7 +47,9 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
 
           {/* Libraries */}
           <div>
-            <h3 className="text-sm font-semibold text-foreground mb-3">Open Source Libraries & Tools</h3>
+            <h3 className="text-sm font-semibold text-foreground mb-3">
+              Open Source Libraries & Tools
+            </h3>
             <div className="space-y-3">
               {libraries.map((lib) => (
                 <div key={lib.name} className="border border-border rounded-md p-3 bg-card">
@@ -66,5 +70,5 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
         </div>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

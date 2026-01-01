@@ -1,9 +1,7 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { Search, PanelLeft, PanelLeftOpen, Plus, Command } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
 import {
   CommandDialog,
   CommandEmpty,
@@ -11,17 +9,19 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from "@/components/ui/command"
-import type { Note } from "@/lib/types"
+} from "@/components/ui/command";
+import type { Note } from "@/lib/types";
+import { Command, PanelLeft, PanelLeftOpen, Plus, Search } from "lucide-react";
+import { useEffect, useState } from "react";
 
 interface CommandPaletteProps {
-  notes: Note[]
-  onSelectNote: (noteId: string) => void
-  isLeftBarCollapsed: boolean
-  onToggleLeftBar: () => void
-  onOpenSettings: () => void
-  onCreateNote: () => void
-  onSearch: (query: string) => void
+  notes: Note[];
+  onSelectNote: (noteId: string) => void;
+  isLeftBarCollapsed: boolean;
+  onToggleLeftBar: () => void;
+  onOpenSettings: () => void;
+  onCreateNote: () => void;
+  onSearch: (query: string) => void;
 }
 
 export function CommandPalette({
@@ -33,49 +33,53 @@ export function CommandPalette({
   onCreateNote,
   onSearch,
 }: CommandPaletteProps) {
-  const [open, setOpen] = useState(false)
-  const [search, setSearch] = useState("")
-  const [isMac, setIsMac] = useState(false)
-  const [isMobile, setIsMobile] = useState(false)
-  const [isElectron, setIsElectron] = useState(false)
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [isMac, setIsMac] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
+  const [isElectron, setIsElectron] = useState(false);
 
   useEffect(() => {
     // Detect OS
-    const userAgent = window.navigator.userAgent.toLowerCase()
-    const isMacOS = /mac/.test(userAgent)
-    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(userAgent)
-    const isElectronApp = navigator.userAgent.toLowerCase().includes("electron")
-    setIsElectron(isElectronApp)
-    setIsMac(isMacOS)
-    setIsMobile(isMobileDevice)
-  }, [])
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    const isMacOS = /mac/.test(userAgent);
+    const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/.test(
+      userAgent
+    );
+    const isElectronApp = navigator.userAgent.toLowerCase().includes("electron");
+    setIsElectron(isElectronApp);
+    setIsMac(isMacOS);
+    setIsMobile(isMobileDevice);
+  }, []);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key === "k" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault()
-        setOpen((open) => !open)
+        e.preventDefault();
+        setOpen((open) => !open);
       }
       if (e.key === "n" && (e.metaKey || e.ctrlKey) && (isElectron || e.altKey)) {
-        console.log("New note shortcut triggered")
-        e.preventDefault()
-        onCreateNote()
+        console.log("New note shortcut triggered");
+        e.preventDefault();
+        onCreateNote();
       }
-    }
+    };
 
-    document.addEventListener("keydown", down)
-    return () => document.removeEventListener("keydown", down)
-  }, [onCreateNote])
+    document.addEventListener("keydown", down);
+    return () => document.removeEventListener("keydown", down);
+  }, [onCreateNote]);
 
-  const filteredNotes = notes.filter((note) => note.title.toLowerCase().includes(search.toLowerCase()))
-  const hasResults = filteredNotes.length > 0
+  const filteredNotes = notes.filter((note) =>
+    note.title.toLowerCase().includes(search.toLowerCase())
+  );
+  const hasResults = filteredNotes.length > 0;
 
   const handleSearchSubmit = () => {
     if (search.trim()) {
-      onSearch(search)
-      setOpen(false)
+      onSearch(search);
+      setOpen(false);
     }
-  }
+  };
 
   return (
     <>
@@ -86,7 +90,11 @@ export function CommandPalette({
           onClick={onToggleLeftBar}
           className="h-9 w-9 p-0 rounded-lg bg-background border border-border shadow-sm hover:bg-accent flex-shrink-0"
         >
-          {isLeftBarCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeft className="h-4 w-4" />}
+          {isLeftBarCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <PanelLeft className="h-4 w-4" />
+          )}
         </Button>
 
         <button
@@ -118,16 +126,24 @@ export function CommandPalette({
                 <>
                   <Command className="h-3 w-3" />
                   <span>+</span>
-                  {!isElectron && (<><span>⌥</span>
-                  <span>+</span></>)}
+                  {!isElectron && (
+                    <>
+                      <span>⌥</span>
+                      <span>+</span>
+                    </>
+                  )}
                   <span>N</span>
                 </>
               ) : (
                 <>
                   <span className="text-xs">Ctrl</span>
                   <span>+</span>
-                   {!isElectron && (<><span>Alt</span>
-                  <span>+</span></>)}
+                  {!isElectron && (
+                    <>
+                      <span>Alt</span>
+                      <span>+</span>
+                    </>
+                  )}
                   <span>N</span>
                 </>
               )}
@@ -145,7 +161,7 @@ export function CommandPalette({
           onValueChange={setSearch}
           onKeyDown={(e) => {
             if (e.key === "Enter" && search.trim()) {
-              handleSearchSubmit()
+              handleSearchSubmit();
             }
           }}
         />
@@ -155,9 +171,9 @@ export function CommandPalette({
               <p className="text-muted-foreground mb-3">No results found for "{search}"</p>
               <Button
                 onClick={() => {
-                  onCreateNote()
-                  setOpen(false)
-                  setSearch("")
+                  onCreateNote();
+                  setOpen(false);
+                  setSearch("");
                 }}
                 size="sm"
                 variant="outline"
@@ -174,9 +190,9 @@ export function CommandPalette({
                 <CommandItem
                   key={note.id}
                   onSelect={() => {
-                    onSelectNote(note.id)
-                    setOpen(false)
-                    setSearch("")
+                    onSelectNote(note.id);
+                    setOpen(false);
+                    setSearch("");
                   }}
                 >
                   {note.title}
@@ -188,9 +204,9 @@ export function CommandPalette({
           <CommandGroup heading="Actions">
             <CommandItem
               onSelect={() => {
-                onCreateNote()
-                setOpen(false)
-                setSearch("")
+                onCreateNote();
+                setOpen(false);
+                setSearch("");
               }}
             >
               <Plus className="h-4 w-4 mr-2" />
@@ -198,18 +214,18 @@ export function CommandPalette({
             </CommandItem>
             <CommandItem
               onSelect={() => {
-                onOpenSettings()
-                setOpen(false)
-                setSearch("")
+                onOpenSettings();
+                setOpen(false);
+                setSearch("");
               }}
             >
               Open Settings
             </CommandItem>
             <CommandItem
               onSelect={() => {
-                onToggleLeftBar()
-                setOpen(false)
-                setSearch("")
+                onToggleLeftBar();
+                setOpen(false);
+                setSearch("");
               }}
             >
               Toggle Sidebar
@@ -218,5 +234,5 @@ export function CommandPalette({
         </CommandList>
       </CommandDialog>
     </>
-  )
+  );
 }
