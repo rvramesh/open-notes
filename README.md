@@ -145,6 +145,6 @@ Open Notes is released under the **MIT License**.
 
 Open Notes is an exploration of a fundamental question:
 
-**How can we organize, evolve, and maintain a digital clone of a human’s knowledge — one that grows alongside how a person thinks, learns, and connects ideas over time?**
+**How can we organize, evolve, and maintain a digital clone of a human’s knowledge — one that mirrors a person’s thinking and learning over time?**
 
 Write · Enrich · Connect · Gift
