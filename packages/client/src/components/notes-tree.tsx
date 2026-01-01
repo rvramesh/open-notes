@@ -210,7 +210,7 @@ export function NotesTree({
     <div className="w-64 border-r border-border bg-card flex flex-col h-screen">
       <div className="h-14 flex items-center gap-2 px-4 border-b border-border">
         <Brain className="h-5 w-5 text-primary" />
-        <span className="font-semibold">Second Brain</span>
+        <span className="font-semibold">Open Notes</span>
       </div>
 
       {!isSearchActive && (

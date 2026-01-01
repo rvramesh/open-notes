@@ -26,7 +26,7 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[85vh]">
         <DialogHeader>
-          <DialogTitle>About Second Brain</DialogTitle>
+          <DialogTitle>About Open Notes</DialogTitle>
         </DialogHeader>
 
         <div className="overflow-y-auto max-h-[calc(85vh-120px)] space-y-6">
