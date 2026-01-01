@@ -88,7 +88,7 @@ export function CommandPalette({
           variant="ghost"
           size="sm"
           onClick={onToggleLeftBar}
-          className="h-9 w-9 p-0 rounded-lg bg-background border border-border shadow-sm hover:bg-accent flex-shrink-0"
+          className="h-9 w-9 p-0 rounded-lg bg-background border border-border shadow-sm hover:bg-accent shrink-0"
         >
           {isLeftBarCollapsed ? (
             <PanelLeftOpen className="h-4 w-4" />
@@ -101,7 +101,7 @@ export function CommandPalette({
           onClick={() => setOpen(true)}
           className="flex-1  h-9 md:h-10 px-3 md:px-4 rounded-lg border border-border bg-background flex items-center gap-2 md:gap-3 text-sm text-muted-foreground hover:bg-accent transition-colors shadow-sm grow"
         >
-          <Search className="h-4 w-4 flex-shrink-0" />
+          <Search className="h-4 w-4 shrink-0" />
           <span className="hidden sm:inline">Search or type a command...</span>
           <span className="sm:hidden">Search...</span>
           {!isMobile && (
@@ -116,7 +116,7 @@ export function CommandPalette({
         <Button
           onClick={onCreateNote}
           size="sm"
-          className="h-9 md:h-10 rounded-lg shadow-sm flex-shrink-0 px-2 md:px-4"
+          className="h-9 md:h-10 rounded-lg shadow-sm shrink-0 px-2 md:px-4"
         >
           <Plus className="h-4 w-4" />
           <span className="hidden md:inline ml-2">New Note</span>

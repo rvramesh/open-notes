@@ -248,7 +248,7 @@ This document lists all third-party dependencies and their licenses.
   Object.entries(approvedByLicense)
     .sort(([a], [b]) => a.localeCompare(b))
     .forEach(([license, packages]) => {
-      content += `\n#### ${license}\n\n`;
+      content += `\n#### ${license} (${packages.length})\n\n`;
       packages
         .sort((a, b) => a.name.localeCompare(b.name))
         .forEach(pkg => {

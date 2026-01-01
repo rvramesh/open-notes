@@ -6,8 +6,8 @@ This document lists all third-party dependencies and their licenses.
 
 ## Summary
 
-- **Total Packages:** 138
-- **Approved Licenses:** 138
+- **Total Packages:** 139
+- **Approved Licenses:** 139
 - **Flagged Licenses:** 0
 
 ---
@@ -16,7 +16,8 @@ This document lists all third-party dependencies and their licenses.
 
 ### MIT-Compatible Licenses ✅
 
-#### Apache-2.0
+
+#### Apache-2.0 (4)
 
 - **@ai-sdk/react** (v2.0.28)
   Repository: git+https://github.com/vercel/ai.git
@@ -31,19 +32,19 @@ This document lists all third-party dependencies and their licenses.
   Repository: https://github.com/microsoft/TypeScript.git
   Homepage: https://www.typescriptlang.org/
 
-#### BSD-2-Clause
+#### BSD-2-Clause (1)
 
 - **@typescript-eslint/parser** (v7.18.0)
   Repository: https://github.com/typescript-eslint/typescript-eslint.git
   Homepage: https://typescript-eslint.io/packages/parser
 
-#### ISC
+#### ISC (1)
 
 - **lucide-react** (v0.454.0)
   Repository: https://github.com/lucide-icons/lucide.git
   Homepage: https://lucide.dev
 
-#### MIT
+#### MIT (133)
 
 - **@ariakit/react** (v0.4.20)
   Repository: https://github.com/ariakit/ariakit.git
@@ -240,6 +241,9 @@ This document lists all third-party dependencies and their licenses.
 - **@tailwindcss/postcss** (v4.1.18)
   Repository: https://github.com/tailwindlabs/tailwindcss.git
   Homepage: https://tailwindcss.com
+- **@types/lodash** (v4.17.21)
+  Repository: https://github.com/DefinitelyTyped/DefinitelyTyped.git
+  Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/lodash
 - **@types/node** (v20.19.27)
   Repository: https://github.com/DefinitelyTyped/DefinitelyTyped.git
   Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node
