@@ -104,6 +104,15 @@ export function NotesWorkspace() {
     )
   }
 
+  const handleDeleteNote = (noteId: string) => {
+    setNotes((prev) => prev.filter((note) => note.id !== noteId))
+    // Select another note if the deleted one was selected
+    if (selectedNoteId === noteId) {
+      const remainingNotes = notes.filter((note) => note.id !== noteId)
+      setSelectedNoteId(remainingNotes[0]?.id || null)
+    }
+  }
+
   const handleOpenSettingsWithCategory = (categoryName: string) => {
     setSettingsPreSelect("categories")
     setSettingsPreFillCategory(categoryName)
@@ -159,7 +168,7 @@ export function NotesWorkspace() {
   }
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background overflow-hidden">
       {!isLeftBarCollapsed && (
         <NotesTree
           notes={notes}
@@ -175,7 +184,7 @@ export function NotesWorkspace() {
         />
       )}
 
-      <div className="flex-1 flex flex-col bg-muted/30 pt-3 gap-1.5">
+      <div className="flex-1 flex flex-col bg-muted pt-3 gap-1.5 min-w-xs min-h-0">
         <CommandPalette
           notes={notes}
           onSelectNote={setSelectedNoteId}
@@ -198,6 +207,7 @@ export function NotesWorkspace() {
           onOpenSettingsWithCategory={handleOpenSettingsWithCategory}
           onSearchByCategory={handleSearchByCategory}
           onSearchByTag={handleSearchByTag}
+          onDeleteNote={handleDeleteNote}
         />
       </div>
 

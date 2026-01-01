@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useState, useEffect, useMemo, useRef } from "react"
-import { Loader2, Check, Plus, X, Sparkles, FileText } from "lucide-react"
+import { Loader2, Check, Plus, X, Sparkles, FileText, MoreVertical, Download, Trash2 } from "lucide-react"
 import type { Note, Tag, Category } from "@/lib/types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,23 @@ import { cn } from "@/lib/utils"
 import { formatRelativeTime } from "@/lib/utils"
 import { LexicalEditor } from "@/components/lexical-editor"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 interface NoteEditorProps {
   note: Note | null
@@ -23,6 +40,7 @@ interface NoteEditorProps {
   onOpenSettingsWithCategory?: (categoryName: string) => void
   onSearchByCategory?: (categoryId: string) => void
   onSearchByTag?: (tagId: string) => void
+  onDeleteNote?: (noteId: string) => void
 }
 
 const tagColorClasses = {
@@ -45,6 +63,7 @@ export function NoteEditor({
   onOpenSettingsWithCategory,
   onSearchByCategory,
   onSearchByTag,
+  onDeleteNote,
 }: NoteEditorProps) {
   const [title, setTitle] = useState("")
   const [content, setContent] = useState("")
@@ -58,6 +77,7 @@ export function NoteEditor({
   const [newCategoryName, setNewCategoryName] = useState("")
   const [tagFilter, setTagFilter] = useState("")
   const [categoryFilter, setCategoryFilter] = useState("")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
 
   const [hasChanges, setHasChanges] = useState(false)
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -195,6 +215,31 @@ export function NoteEditor({
     }
   }
 
+  const handleExportPDF = () => {
+    if (!note) return
+    
+    // Create a formatted text version of the note
+    const noteContent = `${note.title}\n\nCreated: ${note.createdAt.toLocaleDateString()}\nUpdated: ${note.updatedAt.toLocaleDateString()}\n\n${note.content}`
+    
+    // Create a blob and download
+    const blob = new Blob([noteContent], { type: 'text/plain' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.txt`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDeleteNote = () => {
+    if (note && onDeleteNote) {
+      onDeleteNote(note.id)
+      setIsDeleteDialogOpen(false)
+    }
+  }
+
   if (!note) {
     return (
       <div className="flex-1 flex items-center justify-center bg-muted/30">
@@ -209,12 +254,12 @@ export function NoteEditor({
   const noteCategories = categories.filter((cat) => note.categoryIds.includes(cat.id))
 
   return (
-    <div className="flex-1 flex flex-col px-0 md:px-4 pb-3">
-      <div className="flex-1 bg-background md:rounded-xl md:border md:border-border md:shadow-sm flex flex-col overflow-hidden">
+    <div className="flex-1 flex flex-col px-0 md:px-4 pb-3 min-h-0 notes-section">
+      <div className="flex-1 bg-background md:rounded-xl md:border md:border-border md:shadow-sm flex flex-col overflow-hidden min-h-0">
         <div className="p-3 border-b border-border">
           <input
             type="text"
-            value={title}
+            value={title === "Untitled Note" ? "" : title}
             onChange={handleTitleChange}
             placeholder="Untitled Note"
             className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground"
@@ -276,13 +321,35 @@ export function NoteEditor({
                 <Sparkles className="h-3 w-3" />
                 <span>Enriched</span>
               </button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleExportPDF}>
+                    <Download className="h-4 w-4 mr-2" />
+                    Export
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => setIsDeleteDialogOpen(true)}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete note
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {showEnriched ? (
-            <div className="prose prose-sm max-w-none">
+            <div className="prose prose-sm max-w-none  p-4">
               <div className="rounded-lg bg-primary/5 border border-primary/20 p-4 mb-4">
                 <h3 className="text-base font-semibold text-foreground mb-2">AI-Enhanced Summary</h3>
                 <p className="text-foreground text-sm leading-relaxed">
@@ -305,7 +372,7 @@ export function NoteEditor({
           )}
         </div>
 
-        <div className="p-3 border-t border-border bg-muted/30 space-y-2">
+        <div className="p-3 border-t border-border bg-muted space-y-2">
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs font-medium text-muted-foreground">CATEGORIES</span>
@@ -474,6 +541,26 @@ export function NoteEditor({
           </div>
         </div>
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Note</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete "{note.title}"? This action cannot be undone and the note will be permanently removed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteNote}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

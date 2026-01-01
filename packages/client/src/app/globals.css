@@ -1,4 +1,6 @@
 @import "tailwindcss";
+
+@plugin "tailwind-scrollbar-hide";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -43,6 +45,8 @@
   --shadow-spread: 0px;
   --shadow-opacity: 0.05;
   --shadow-color: #000000;
+  --highlight: oklch(0.852 0.199 91.936);
+  --brand: oklch(0.623 0.214 259.815);
 }
 
 .dark {
@@ -89,6 +93,8 @@
   --shadow-spread: 0px;
   --shadow-opacity: 0.05;
   --shadow-color: #000000;
+  --highlight: oklch(0.852 0.199 91.936);
+  --brand: oklch(0.707 0.165 254.624);
 }
 
 @theme inline {
@@ -157,6 +163,8 @@
   --shadow-blur: var(--shadow-blur);
   --shadow-y: var(--shadow-y);
   --shadow-x: var(--shadow-x);
+  --color-brand: var(--brand);
+  --color-highlight: var(--highlight);
 }
 
 @layer base {
@@ -166,4 +174,32 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+[contenteditable="true"],
+[contenteditable="true"] a,
+.notes-section span,
+.notes-section input,
+.notes-section p {
+  cursor: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="22" viewBox="0 0 8 22"><g stroke="white" stroke-width="2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g><g stroke="black" stroke-width="1.2" fill="none"><line x1="4" y1="3" x2="4" y2="19"/><line x1="1" y1="3" x2="7" y2="3"/><line x1="1" y1="19" x2="7" y2="19"/></g></svg>') 4 11, text;
+}
+
+.notes-section button,
+.notes-section button>* {
+  cursor: pointer;
+}
+
+.dark [contenteditable="true"],
+.dark [contenteditable="true"] a,
+.dark .notes-section span,
+.dark .notes-section input,
+.dark .notes-section p  {
+  cursor: text;
+}
+
+
+.dark .notes-section button,
+.dark .notes-section button>* {
+  cursor: pointer;
 }

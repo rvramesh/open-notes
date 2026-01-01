@@ -2,6 +2,7 @@
 
 import { X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 interface AboutDialogProps {
   onClose: () => void
@@ -20,23 +21,15 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
   ]
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
-      <div
-        className="bg-background border border-border rounded-lg shadow-lg w-full max-w-2xl max-h-[90vh] overflow-hidden m-4"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-6 py-4">
-          <h2 className="text-lg font-semibold">About Second Brain</h2>
-          <Button variant="ghost" size="sm" onClick={onClose} className="h-8 w-8 p-0">
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+    <Dialog open={true} onOpenChange={onClose}>
+      <DialogContent className="max-w-2xl max-h-[85vh]">
+        <DialogHeader>
+          <DialogTitle>About Second Brain</DialogTitle>
+        </DialogHeader>
 
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-5rem)]">
+        <div className="overflow-y-auto max-h-[calc(85vh-120px)] space-y-6">
           {/* Version Info */}
-          <div className="mb-6">
+          <div>
             <h3 className="text-sm font-semibold text-foreground mb-2">Version Information</h3>
             <div className="bg-muted/50 rounded-md p-4 space-y-1">
               <div className="flex justify-between text-sm">
@@ -67,11 +60,11 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           </div>
 
           {/* Footer */}
-          <div className="mt-6 pt-4 border-t border-border text-center text-xs text-muted-foreground">
+          <div className="pt-4 border-t border-border text-center text-xs text-muted-foreground">
             Built with ❤️ using modern web technologies
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   )
 }
