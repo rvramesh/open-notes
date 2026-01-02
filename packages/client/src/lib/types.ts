@@ -1,7 +1,7 @@
 // Core primitives
 export type NoteId = string;
 export type BlockId = string;
-export type Timestamp = number;
+export type Timestamp = number; // Milliseconds since Unix epoch (UTC), from Date.now()
 export type Embedding = number[];
 
 // Block Model

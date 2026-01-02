@@ -23,6 +23,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import type { Category, Note, Tag } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import {
+  AlertTriangle,
   Check,
   Download,
   FileText,
@@ -80,7 +81,6 @@ export function NoteEditor({
   const [title, setTitle] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
-  const [isTyping, setIsTyping] = useState(false);
   const [showEnriched, setShowEnriched] = useState(false);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -92,7 +92,6 @@ export function NoteEditor({
 
   const [hasChanges, setHasChanges] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingContentRef = useRef<string | null>(null);
   const saveInProgressRef = useRef<boolean>(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -112,9 +111,7 @@ export function NoteEditor({
       pendingContentRef.current = null; // Clear pending changes when switching notes
       setHasChanges(false);
       setIsSaved(true);
-      setIsTyping(false);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
       
       // Focus title input when a new note is loaded
       setTimeout(() => titleInputRef.current?.focus(), 0);
@@ -123,9 +120,7 @@ export function NoteEditor({
       pendingContentRef.current = null;
       setHasChanges(false);
       setIsSaved(true);
-      setIsTyping(false);
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     }
   }, [note?.id]);
 
@@ -138,23 +133,12 @@ export function NoteEditor({
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
-    if (typingTimeoutRef.current) {
-      clearTimeout(typingTimeoutRef.current);
-    }
 
-    // Show typing indicator immediately
-    setIsTyping(true);
     setIsSaving(false);
     setIsSaved(false);
 
-    // Clear typing indicator after 10 seconds of no changes
-    typingTimeoutRef.current = setTimeout(() => {
-      setIsTyping(false);
-    }, 10000);
-
     // Save after 10 seconds of no changes
     saveTimeoutRef.current = setTimeout(async () => {
-      setIsTyping(false);
       setIsSaving(true);
       saveInProgressRef.current = true;
 
@@ -192,11 +176,25 @@ export function NoteEditor({
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
-      if (typingTimeoutRef.current) {
-        clearTimeout(typingTimeoutRef.current);
-      }
     };
   }, [title, noteId, onUpdateNote, hasChanges]);
+
+  // Handle Ctrl+S / Cmd+S keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Check for Ctrl+S (Windows/Linux) or Cmd+S (macOS)
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault(); // Prevent browser's save dialog
+        handleSaveNow();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [noteId, hasChanges]); // Re-attach when these change
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
@@ -228,9 +226,7 @@ export function NoteEditor({
 
     // Clear timeouts
     if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
 
-    setIsTyping(false);
     setIsSaving(true);
     saveInProgressRef.current = true;
 
@@ -427,18 +423,19 @@ export function NoteEditor({
           <div className="flex items-center justify-between mt-2 flex-wrap gap-2">
             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
               <span>Updated {formatRelativeTime(note.updatedAt)}</span>
-              {isTyping && (
+              {hasChanges && !isSaving && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-1 text-amber-600 dark:text-amber-500">
-                    <span>Typing...</span>
+                  <div className="flex items-center gap-1 text-muted-foreground">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span>Unsaved changes</span>
                   </div>
                 </>
               )}
               {isSaving && (
                 <>
                   <span>•</span>
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1 text-yellow-600 dark:text-yellow-500">
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     <span>Saving</span>
                   </div>

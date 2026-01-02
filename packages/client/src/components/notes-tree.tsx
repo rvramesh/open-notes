@@ -69,7 +69,7 @@ export function NotesTree({
   };
 
   const renderCategoryView = () => {
-    return categories.map((category) => {
+    const categoryElements = categories.map((category) => {
       const categoryNotes = notes.filter((note) => note.categories.includes(category.id));
       const isExpanded = expandedCategories.has(category.id);
 
@@ -102,14 +102,54 @@ export function NotesTree({
         </div>
       );
     });
+
+    // Add Uncategorized section for notes without any categories
+    const uncategorizedNotes = notes.filter((note) => note.categories.length === 0);
+    if (uncategorizedNotes.length > 0) {
+      const isUncategorizedExpanded = expandedCategories.has("uncategorized");
+      categoryElements.push(
+        <div key="uncategorized" className="mb-0.5">
+          <button
+            onClick={() => toggleCategory("uncategorized")}
+            className="flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-sm hover:bg-muted transition-colors"
+          >
+            {isUncategorizedExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+            <span className="font-medium text-foreground text-sm">Uncategorized</span>
+            <span className="ml-auto text-xs text-muted-foreground">{uncategorizedNotes.length}</span>
+          </button>
+          {isUncategorizedExpanded && (
+            <div className="ml-5 mt-0.5 space-y-0.5">
+              {uncategorizedNotes.map((note) => (
+                <NoteItem
+                  key={`uncategorized-${note.id}`}
+                  note={note}
+                  isSelected={note.id === selectedNoteId}
+                  onSelect={() => onSelectNote(note.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return categoryElements;
   };
 
   const renderTimeView = () => {
-    const todayNotes = notes.filter((note) => isToday(note.updatedAt));
-    const thisWeekNotes = notes.filter(
+    // Sort notes by updatedAt in descending order (latest first)
+    const sortedNotes = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+
+    // Group notes by time period
+    const todayNotes = sortedNotes.filter((note) => isToday(note.updatedAt));
+    const thisWeekNotes = sortedNotes.filter(
       (note) => isThisWeek(note.updatedAt) && !isToday(note.updatedAt)
     );
-    const olderNotes = notes.filter((note) => !isThisWeek(note.updatedAt));
+    const olderNotes = sortedNotes.filter((note) => !isThisWeek(note.updatedAt));
 
     return (
       <>
