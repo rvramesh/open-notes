@@ -29,12 +29,11 @@ export function NotesWorkspace() {
   const categories = Object.values(categoriesMap);
 
   // Tags store
-  const tagsMap = useTagsStore((state) => state.tags);
-  const createTag = useTagsStore((state) => state.createTag);
-  const updateTag = useTagsStore((state) => state.updateTag);
-  const deleteTag = useTagsStore((state) => state.deleteTag);
+  const addTag = useTagsStore((state) => state.addTag);
+  const removeTag = useTagsStore((state) => state.removeTag);
+  const getAllTags = useTagsStore((state) => state.getAllTags);
   const refreshTags = useTagsStore((state) => state.refreshFromAdapter);
-  const tags = Object.values(tagsMap);
+  const tags = getAllTags();
   
   // Derive notes array from the map (stable reference via orderedNoteIds)
   const notes = orderedNoteIds.map(id => notesMap[id]).filter((note): note is Note => note !== undefined);
@@ -89,7 +88,7 @@ export function NotesWorkspace() {
   };
 
   const handleRemoveTag = async (tagId: string) => {
-    await deleteTag(tagId);
+    await removeTag(tagId);
     // Remove tag from all notes
     notes.forEach((note) => {
       if (note.tags.user.includes(tagId)) {
@@ -240,7 +239,10 @@ export function NotesWorkspace() {
           tags={tags}
           categories={categories}
           onUpdateNote={handleUpdateNote}
-          onAddTag={async (tag) => await createTag(tag.name)}
+          onAddTag={async (tagName) => {
+            const normalizedTag = await addTag(tagName);
+            return normalizedTag;
+          }}
           onAddCategory={async (category) => await createCategory(category.name, category.aiPrompt)}
           onRemoveTag={handleRemoveTag}
           onRemoveCategory={handleRemoveCategory}

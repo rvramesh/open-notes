@@ -22,6 +22,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Category, Note, Tag } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
+import { normalizeTag, getTagColor } from "@/lib/tag-utils";
 import {
   AlertTriangle,
   Check,
@@ -35,7 +36,8 @@ import {
   X,
 } from "lucide-react";
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { debounce } from "lodash";
 import { PlateEditor } from "./plate-editor";
 
 interface NoteEditorProps {
@@ -44,7 +46,7 @@ interface NoteEditorProps {
   tags: Tag[];
   categories: Category[];
   onUpdateNote: (noteId: string, updates: Partial<Note>) => Promise<void>;
-  onAddTag: (tag: Tag) => void;
+  onAddTag: (tagName: string) => Promise<string>;
   onAddCategory: (category: Category) => void;
   onRemoveTag: (tagId: string) => void;
   onRemoveCategory: (categoryId: string) => void;
@@ -107,11 +109,14 @@ export function NoteEditor({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [hasChanges, setHasChanges] = useState(false);
-  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const pendingContentRef = useRef<string | null>(null);
   const saveInProgressRef = useRef<boolean>(false);
+  const noteIdRef = useRef<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const latestTitleRef = useRef<string>("");
+  const latestContentStringRef = useRef<string>("");
+  const onUpdateNoteRef = useRef(onUpdateNote);
 
   // Serialize contentBlocks to JSON string for the editor
   const contentString = useMemo(() => {
@@ -127,7 +132,6 @@ export function NoteEditor({
       pendingContentRef.current = null; // Clear pending changes when switching notes
       setHasChanges(false);
       setIsSaved(true);
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       
       // Focus title input when a new note is loaded
       setTimeout(() => titleInputRef.current?.focus(), 0);
@@ -136,33 +140,29 @@ export function NoteEditor({
       pendingContentRef.current = null;
       setHasChanges(false);
       setIsSaved(true);
-      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     }
   }, [note?.id]);
 
+  // Keep refs up to date with latest values
   useEffect(() => {
-    if (!noteId) return;
-    if (!hasChanges) return;
-    if (saveInProgressRef.current) return;
+    latestTitleRef.current = title;
+    latestContentStringRef.current = contentString;
+    onUpdateNoteRef.current = onUpdateNote;
+    noteIdRef.current = noteId;
+  }, [title, contentString, onUpdateNote, noteId]);
 
-    // Clear any existing timeouts
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
+  // Create debounced save function
+  const debouncedSave = useRef(
+    debounce(async () => {
+      if (!noteIdRef.current || saveInProgressRef.current) return;
 
-    setIsSaving(false);
-    setIsSaved(false);
-
-    // Save after 10 seconds of no changes
-    saveTimeoutRef.current = setTimeout(async () => {
       setIsSaving(true);
       saveInProgressRef.current = true;
 
       try {
-        // Parse content string back to blocks
         let contentBlocks = [];
         try {
-          const contentToSave = pendingContentRef.current || contentString;
+          const contentToSave = pendingContentRef.current || latestContentStringRef.current;
           if (contentToSave) {
             contentBlocks = JSON.parse(contentToSave);
           }
@@ -170,15 +170,15 @@ export function NoteEditor({
           console.error("Failed to parse content blocks:", e);
         }
 
-        await onUpdateNote(noteId, {
-          title,
+        await onUpdateNoteRef.current(noteIdRef.current, {
+          title: latestTitleRef.current,
           contentBlocks,
         });
 
         setIsSaving(false);
         setIsSaved(true);
         setHasChanges(false);
-        pendingContentRef.current = null; // Clear pending content after save
+        pendingContentRef.current = null;
       } catch (error) {
         console.error("Failed to save note:", error);
         setIsSaving(false);
@@ -186,14 +186,54 @@ export function NoteEditor({
       } finally {
         saveInProgressRef.current = false;
       }
-    }, 10000);
+    }, 10000)
+  ).current;
 
+  // Cleanup debounce on unmount
+  useEffect(() => {
     return () => {
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
-      }
+      debouncedSave.cancel();
     };
-  }, [title, noteId, onUpdateNote, hasChanges]);
+  }, [debouncedSave]);
+
+  const handleSaveNow = useCallback(async () => {
+    if (!noteIdRef.current || !hasChanges || saveInProgressRef.current) return;
+
+    // Cancel pending debounced save
+    debouncedSave.cancel();
+
+    setIsSaving(true);
+    saveInProgressRef.current = true;
+
+    try {
+      let contentBlocks = [];
+      try {
+        // Use pending content ref which has the latest from the editor
+        const contentToSave = pendingContentRef.current || latestContentStringRef.current;
+        if (contentToSave) {
+          contentBlocks = JSON.parse(contentToSave);
+        }
+      } catch (e) {
+        console.error("Failed to parse content blocks:", e);
+      }
+
+      await onUpdateNote(noteIdRef.current, {
+        title: latestTitleRef.current,
+        contentBlocks,
+      });
+
+      setIsSaving(false);
+      setIsSaved(true);
+      setHasChanges(false);
+      pendingContentRef.current = null;
+    } catch (error) {
+      console.error("Failed to save note:", error);
+      setIsSaving(false);
+      setIsSaved(false);
+    } finally {
+      saveInProgressRef.current = false;
+    }
+  }, [hasChanges, onUpdateNote, debouncedSave]);
 
   // Handle Ctrl+S / Cmd+S keyboard shortcut
   useEffect(() => {
@@ -210,11 +250,13 @@ export function NoteEditor({
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [noteId, hasChanges]); // Re-attach when these change
+  }, [handleSaveNow]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
     setHasChanges(true);
+    setIsSaved(false);
+    debouncedSave();
   };
 
   const handleTitleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -234,44 +276,8 @@ export function NoteEditor({
     if (newContent !== currentContent) {
       pendingContentRef.current = newContent;
       setHasChanges(true);
-    }
-  };
-
-  const handleSaveNow = async () => {
-    if (!noteId || !hasChanges || saveInProgressRef.current) return;
-
-    // Clear timeouts
-    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
-
-    setIsSaving(true);
-    saveInProgressRef.current = true;
-
-    try {
-      let contentBlocks = [];
-      try {
-        const contentToSave = pendingContentRef.current || contentString;
-        if (contentToSave) {
-          contentBlocks = JSON.parse(contentToSave);
-        }
-      } catch (e) {
-        console.error("Failed to parse content blocks:", e);
-      }
-
-      await onUpdateNote(noteId, {
-        title,
-        contentBlocks,
-      });
-
-      setIsSaving(false);
-      setIsSaved(true);
-      setHasChanges(false);
-      pendingContentRef.current = null;
-    } catch (error) {
-      console.error("Failed to save note:", error);
-      setIsSaving(false);
       setIsSaved(false);
-    } finally {
-      saveInProgressRef.current = false;
+      debouncedSave();
     }
   };
 
@@ -315,22 +321,22 @@ export function NoteEditor({
     });
   };
 
-  const handleAddTag = () => {
-    if (tagFilter.trim()) {
-      const newTag: Tag = {
-        id: Date.now().toString(),
-        name: tagFilter.trim(),
-        color: "blue",
-      };
-      onAddTag(newTag);
-      if (noteId && note) {
-        onUpdateNote(noteId, {
-          tags: {
-            ...note.tags,
-            user: [...note.tags.user, newTag.id],
-          },
-        });
-      }
+  const handleAddTag = async () => {
+    if (tagFilter.trim() && noteId && note) {
+      // Normalize the tag name
+      const normalizedTag = normalizeTag(tagFilter);
+      
+      // Add tag to the store (returns the normalized tag string)
+      const tagString = await onAddTag(normalizedTag);
+      
+      // Add the tag to the note's user tags
+      await onUpdateNote(noteId, {
+        tags: {
+          ...note.tags,
+          user: [...note.tags.user, tagString],
+        },
+      });
+      
       setTagFilter("");
       setIsAddingTag(false);
     }
@@ -346,9 +352,10 @@ export function NoteEditor({
 
   const filteredTags = useMemo(() => {
     if (!tagFilter.trim()) return tags.filter((tag) => !note?.tags.user.includes(tag.id));
+    const normalized = normalizeTag(tagFilter);
     return tags.filter(
       (tag) =>
-        !note?.tags.user.includes(tag.id) && tag.name.toLowerCase().includes(tagFilter.toLowerCase())
+        !note?.tags.user.includes(tag.id) && tag.name.includes(normalized)
     );
   }, [tags, tagFilter, note?.tags]);
 
@@ -361,32 +368,22 @@ export function NoteEditor({
         cat.name.toLowerCase().includes(categoryFilter.toLowerCase())
     );
   }, [categories, categoryFilter, note?.categories]);
-  // Auto-select when there's only one option
-  useEffect(() => {
-    if (isAddingCategory) {
-      if (filteredCategories.length === 1) {
-        setSelectedCategoryIndex(0);
-      } else if (filteredCategories.length === 0 && categoryFilter.trim()) {
-        // Select the "Add" option
-        setSelectedCategoryIndex(0);
-      } else {
-        setSelectedCategoryIndex(-1);
-      }
-    }
-  }, [filteredCategories, categoryFilter, isAddingCategory]);
 
-  useEffect(() => {
-    if (isAddingTag) {
-      if (filteredTags.length === 1) {
-        setSelectedTagIndex(0);
-      } else if (filteredTags.length === 0 && tagFilter.trim()) {
-        // Select the "Add" option
-        setSelectedTagIndex(0);
-      } else {
-        setSelectedTagIndex(-1);
-      }
-    }
-  }, [filteredTags, tagFilter, isAddingTag]);
+  // Compute selected indices directly instead of using useEffect
+  const computedCategoryIndex = useMemo(() => {
+    if (!isAddingCategory) return -1;
+    if (filteredCategories.length === 1) return 0;
+    if (filteredCategories.length === 0 && categoryFilter.trim()) return 0;
+    return -1;
+  }, [filteredCategories.length, categoryFilter, isAddingCategory]);
+
+  const computedTagIndex = useMemo(() => {
+    if (!isAddingTag) return -1;
+    if (filteredTags.length === 1) return 0;
+    if (filteredTags.length === 0 && tagFilter.trim()) return 0;
+    return -1;
+  }, [filteredTags.length, tagFilter, isAddingTag]);
+
   const handleCategoryClick = (categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
       onSearchByCategory(categoryId);
@@ -622,22 +619,33 @@ export function NoteEditor({
                       value={categoryFilter}
                       onChange={(e) => {
                         setCategoryFilter(e.target.value);
-                        setSelectedCategoryIndex(-1);
+                        // Reset manual selection when typing
+                        if (selectedCategoryIndex !== -1) {
+                          setSelectedCategoryIndex(-1);
+                        }
                       }}
                       onKeyDown={(e) => {
                         const maxIndex = filteredCategories.length > 0 ? filteredCategories.length - 1 : 0;
+                        const currentIndex = selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex;
                         
                         if (e.key === "ArrowDown") {
                           e.preventDefault();
-                          setSelectedCategoryIndex((prev) => Math.min(prev + 1, maxIndex));
+                          setSelectedCategoryIndex((prev) => {
+                            const current = prev === -1 ? computedCategoryIndex : prev;
+                            return Math.min(current + 1, maxIndex);
+                          });
                         } else if (e.key === "ArrowUp") {
                           e.preventDefault();
-                          setSelectedCategoryIndex((prev) => Math.max(prev - 1, -1));
+                          setSelectedCategoryIndex((prev) => {
+                            const current = prev === -1 ? computedCategoryIndex : prev;
+                            return Math.max(current - 1, -1);
+                          });
                         } else if (e.key === "Enter") {
                           e.preventDefault();
-                          if (filteredCategories.length > 0 && selectedCategoryIndex >= 0) {
+                          const indexToUse = selectedCategoryIndex !== -1 ? selectedCategoryIndex : computedCategoryIndex;
+                          if (filteredCategories.length > 0 && indexToUse >= 0) {
                             // Select existing category
-                            handleToggleCategory(filteredCategories[selectedCategoryIndex].id);
+                            handleToggleCategory(filteredCategories[indexToUse].id);
                             setIsAddingCategory(false);
                             setCategoryFilter("");
                             setSelectedCategoryIndex(-1);
@@ -654,29 +662,32 @@ export function NoteEditor({
                     />
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {filteredCategories.length > 0 ? (
-                        filteredCategories.map((category, index) => (
-                          <button
-                            key={category.id}
-                            onClick={() => {
-                              handleToggleCategory(category.id);
-                              setIsAddingCategory(false);
-                              setCategoryFilter("");
-                              setSelectedCategoryIndex(-1);
-                            }}
-                            className={cn(
-                              "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
-                              selectedCategoryIndex === index && "bg-accent"
-                            )}
-                          >
-                            {category.name}
-                          </button>
-                        ))
+                        filteredCategories.map((category, index) => {
+                          const isSelected = (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === index;
+                          return (
+                            <button
+                              key={category.id}
+                              onClick={() => {
+                                handleToggleCategory(category.id);
+                                setIsAddingCategory(false);
+                                setCategoryFilter("");
+                                setSelectedCategoryIndex(-1);
+                              }}
+                              className={cn(
+                                "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
+                                isSelected && "bg-accent"
+                              )}
+                            >
+                              {category.name}
+                            </button>
+                          );
+                        })
                       ) : categoryFilter.trim() ? (
                         <button
                           onClick={handleAddCategoryViaSettings}
                           className={cn(
                             "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
-                            selectedCategoryIndex === 0 && "bg-accent"
+                            (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === 0 && "bg-accent"
                           )}
                         >
                           <Plus className="h-3.5 w-3.5 inline mr-2" />
@@ -742,22 +753,33 @@ export function NoteEditor({
                       value={tagFilter}
                       onChange={(e) => {
                         setTagFilter(e.target.value);
-                        setSelectedTagIndex(-1);
+                        // Reset manual selection when typing
+                        if (selectedTagIndex !== -1) {
+                          setSelectedTagIndex(-1);
+                        }
                       }}
                       onKeyDown={(e) => {
                         const maxIndex = filteredTags.length > 0 ? filteredTags.length - 1 : 0;
+                        const currentIndex = selectedTagIndex === -1 ? computedTagIndex : selectedTagIndex;
                         
                         if (e.key === "ArrowDown") {
                           e.preventDefault();
-                          setSelectedTagIndex((prev) => Math.min(prev + 1, maxIndex));
+                          setSelectedTagIndex((prev) => {
+                            const current = prev === -1 ? computedTagIndex : prev;
+                            return Math.min(current + 1, maxIndex);
+                          });
                         } else if (e.key === "ArrowUp") {
                           e.preventDefault();
-                          setSelectedTagIndex((prev) => Math.max(prev - 1, -1));
+                          setSelectedTagIndex((prev) => {
+                            const current = prev === -1 ? computedTagIndex : prev;
+                            return Math.max(current - 1, -1);
+                          });
                         } else if (e.key === "Enter") {
                           e.preventDefault();
-                          if (filteredTags.length > 0 && selectedTagIndex >= 0) {
+                          const indexToUse = selectedTagIndex !== -1 ? selectedTagIndex : computedTagIndex;
+                          if (filteredTags.length > 0 && indexToUse >= 0) {
                             // Select existing tag
-                            handleToggleTag(filteredTags[selectedTagIndex].id);
+                            handleToggleTag(filteredTags[indexToUse].id);
                             setIsAddingTag(false);
                             setTagFilter("");
                             setSelectedTagIndex(-1);
@@ -774,29 +796,32 @@ export function NoteEditor({
                     />
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {filteredTags.length > 0 ? (
-                        filteredTags.map((tag, index) => (
-                          <button
-                            key={tag.id}
-                            onClick={() => {
-                              handleToggleTag(tag.id);
-                              setIsAddingTag(false);
-                              setTagFilter("");
-                              setSelectedTagIndex(-1);
-                            }}
-                            className={cn(
-                              "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
-                              selectedTagIndex === index && "bg-accent"
-                            )}
-                          >
-                            {tag.name}
-                          </button>
-                        ))
+                        filteredTags.map((tag, index) => {
+                          const isSelected = (selectedTagIndex === -1 ? computedTagIndex : selectedTagIndex) === index;
+                          return (
+                            <button
+                              key={tag.id}
+                              onClick={() => {
+                                handleToggleTag(tag.id);
+                                setIsAddingTag(false);
+                                setTagFilter("");
+                                setSelectedTagIndex(-1);
+                              }}
+                              className={cn(
+                                "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
+                                isSelected && "bg-accent"
+                              )}
+                            >
+                              {tag.name}
+                            </button>
+                          );
+                        })
                       ) : tagFilter.trim() ? (
                         <button
                           onClick={handleAddTag}
                           className={cn(
                             "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
-                            selectedTagIndex === 0 && "bg-accent"
+                            (selectedTagIndex === -1 ? computedTagIndex : selectedTagIndex) === 0 && "bg-accent"
                           )}
                         >
                           <Plus className="h-3.5 w-3.5 inline mr-2" />

@@ -1,8 +1,8 @@
-import type { Tag } from '../lib/types';
-
+/**
+ * Adapter interface for tag persistence
+ * Tags are stored as a simple array of normalized strings
+ */
 export interface TagsPersistenceAdapter {
-  fetchAllTags(): Promise<Tag[]>;
-  createTag(tag: Tag): Promise<void>;
-  updateTag(tag: Tag): Promise<void>;
-  deleteTag(tagId: string): Promise<void>;
+  fetchAllTags(): Promise<string[]>;
+  saveTags(tags: string[]): Promise<void>;
 }

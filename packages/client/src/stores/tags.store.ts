@@ -1,33 +1,21 @@
 import { create } from 'zustand';
-import type { Tag, ColorName } from '../lib/types';
+import type { Tag } from '../lib/types';
 import type { TagsPersistenceAdapter } from '../adapters/TagsPersistenceAdapter';
-
-const PASTEL_COLORS: ColorName[] = [
-  'rose', 'pink', 'fuchsia', 'purple', 'violet',
-  'indigo', 'blue', 'sky', 'cyan', 'teal',
-  'emerald', 'green', 'lime', 'yellow', 'amber',
-  'orange', 'red', 'warmGray', 'coolGray', 'slate'
-];
-
-function getRandomColor(): ColorName {
-  return PASTEL_COLORS[Math.floor(Math.random() * PASTEL_COLORS.length)];
-}
+import { normalizeTag, getTagColor } from '../lib/tag-utils';
 
 interface TagsStoreState {
-  tags: Record<string, Tag>;
+  tags: Set<string>; // Denormalized collection of tag strings
   adapter: TagsPersistenceAdapter;
   isLoading: boolean;
   error: string | null;
 }
 
 interface TagsStoreActions {
-  createTag(name: string): Promise<string>;
-  updateTag(id: string, updates: Partial<Tag>): Promise<void>;
-  deleteTag(id: string): Promise<void>;
-  getTag(id: string): Tag | undefined;
+  addTag(name: string): Promise<string>;
+  removeTag(tag: string): Promise<void>;
   getAllTags(): Tag[];
-  getTagByName(name: string): Tag | undefined;
-  hydrate(tags: Tag[]): void;
+  hasTag(tag: string): boolean;
+  hydrate(tags: string[]): void;
   refreshFromAdapter(): Promise<void>;
 }
 
@@ -36,88 +24,64 @@ type TagsStore = TagsStoreState & TagsStoreActions;
 export function createTagsStore(adapter: TagsPersistenceAdapter) {
   return create<TagsStore>((set, get) => ({
     // State
-    tags: {},
+    tags: new Set<string>(),
     adapter,
     isLoading: false,
     error: null,
 
-    // Create tag
-    createTag: async (name: string): Promise<string> => {
-      const id = `tag-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      const tag: Tag = {
-        id,
-        name,
-        color: getRandomColor(),
-      };
-
-      // Update local state
+    // Add a tag (normalized)
+    addTag: async (name: string): Promise<string> => {
+      const normalizedTag = normalizeTag(name);
+      
+      // Add to local state
       set(state => ({
-        tags: { ...state.tags, [id]: tag },
+        tags: new Set(state.tags).add(normalizedTag),
       }));
 
       // Persist
-      await get().adapter.createTag(tag);
+      const allTags = Array.from(get().tags);
+      await get().adapter.saveTags(allTags);
 
-      return id;
+      return normalizedTag;
     },
 
-    // Update tag
-    updateTag: async (id: string, updates: Partial<Tag>): Promise<void> => {
-      const currentTag = get().tags[id];
-      if (!currentTag) {
-        throw new Error(`Tag ${id} not found`);
-      }
-
-      const updatedTag: Tag = {
-        ...currentTag,
-        ...updates,
-      };
-
-      // Update local state
-      set(state => ({
-        tags: { ...state.tags, [id]: updatedTag },
-      }));
-
-      // Persist
-      await get().adapter.updateTag(updatedTag);
-    },
-
-    // Delete tag
-    deleteTag: async (id: string): Promise<void> => {
+    // Remove tag
+    removeTag: async (tag: string): Promise<void> => {
+      const normalizedTag = normalizeTag(tag);
+      
       // Remove from local state
       set(state => {
-        const { [id]: deleted, ...remainingTags } = state.tags;
-        return { tags: remainingTags };
+        const newTags = new Set(state.tags);
+        newTags.delete(normalizedTag);
+        return { tags: newTags };
       });
 
-      // Persist deletion
-      await get().adapter.deleteTag(id);
+      // Persist
+      const allTags = Array.from(get().tags);
+      await get().adapter.saveTags(allTags);
     },
 
-    // Get tag by ID
-    getTag: (id: string): Tag | undefined => {
-      return get().tags[id];
-    },
-
-    // Get all tags as array
+    // Get all tags as Tag objects for UI
     getAllTags: (): Tag[] => {
-      return Object.values(get().tags);
+      return Array.from(get().tags)
+        .sort() // Sort alphabetically
+        .map(tag => ({
+          id: tag,
+          name: tag,
+          color: getTagColor(tag),
+        }));
     },
 
-    // Get tag by name
-    getTagByName: (name: string): Tag | undefined => {
-      return Object.values(get().tags).find(t => t.name === name);
+    // Check if tag exists
+    hasTag: (tag: string): boolean => {
+      const normalizedTag = normalizeTag(tag);
+      return get().tags.has(normalizedTag);
     },
 
-    // Hydrate store with tags
-    hydrate: (tags: Tag[]): void => {
-      const tagsMap: Record<string, Tag> = {};
-      tags.forEach(tag => {
-        tagsMap[tag.id] = tag;
-      });
-
+    // Hydrate from array
+    hydrate: (tags: string[]): void => {
       set({
-        tags: tagsMap,
+        tags: new Set(tags.map(normalizeTag)),
         isLoading: false,
         error: null,
       });
