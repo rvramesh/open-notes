@@ -1,29 +1,93 @@
 "use client";
 
-import { normalizeNodeId } from "platejs";
+import React from "react";
+import { normalizeNodeId, type Value } from "platejs";
 import { Plate, usePlateEditor } from "platejs/react";
 
-import { EditorKit } from "@/components/editor-kit";
+import { EditorKit } from "@/components/editor/editor-kit";
 import { Editor, EditorContainer } from "@/components/ui/editor";
 
-export function PlateEditor() {
+interface PlateEditorProps {
+  content: string;
+  onChange: (content: string) => void;
+}
+
+export function PlateEditor({ content, onChange }: PlateEditorProps) {
+  // Parse initial content or use default
+  const initialValue = content ? parseContent(content) : getDefaultContent();
+
+  // Key is used to force remount the editor when content changes
+  // This is a simple way to reset the uncontrolled component
+  const contentKey = React.useMemo(() => content || "default", [content]);
+
   const editor = usePlateEditor({
     plugins: EditorKit,
-    value,
+    value: initialValue,
   });
 
-  return (
-    <Plate editor={editor}>
-      <EditorContainer variant={"demo"} className="flex-row">
-        <Editor variant="ai" />
-      </EditorContainer>
+  // Track the last serialized value to avoid duplicate onChange calls
+  const lastValueRef = React.useRef<string>(JSON.stringify(initialValue));
 
-      {/* <SettingsDialog /> */}
-    </Plate>
+  // Effect: Listen for editor value changes and notify parent
+  React.useEffect(() => {
+    if (!editor) return;
+
+    // Debounce timer for onChange callback
+    let debounceTimer: NodeJS.Timeout;
+
+    // Create a listener function for value changes
+    const checkForChanges = () => {
+      debounceTimer = setTimeout(() => {
+        const currentValue = JSON.stringify(editor.children);
+        if (currentValue !== lastValueRef.current) {
+          lastValueRef.current = currentValue;
+          onChange(currentValue);
+        }
+      }, 300);
+    };
+
+    // Use MutationObserver or polling to detect changes in the editor DOM
+    // For now, we'll use a polling approach with reasonable frequency
+    const pollInterval = setInterval(checkForChanges, 500);
+
+    return () => {
+      clearInterval(pollInterval);
+      clearTimeout(debounceTimer);
+    };
+  }, [editor, onChange]);
+
+  return (
+    <div key={contentKey} className="h-full">
+      <Plate editor={editor}>
+        <EditorContainer variant={"demo"} className="flex-row">
+          <Editor variant="ai" />
+        </EditorContainer>
+
+        {/* <SettingsDialog /> */}
+      </Plate>
+    </div>
   );
 }
 
-const value = normalizeNodeId([
+/**
+ * Parse string content into normalized Plate.js value format.
+ * Falls back to default content if parsing fails.
+ */
+function parseContent(content: string): Value {
+  try {
+    const parsed = JSON.parse(content);
+    return normalizeNodeId(parsed);
+  } catch {
+    return getDefaultContent();
+  }
+}
+
+/**
+ * Default content for the editor when no content is provided.
+ * Abstracted here to keep all Plate.js-specific logic in one place.
+ */
+function getDefaultContent(): Value {
+  return normalizeNodeId([
   {
     children: [{ text: "Welcome to the Plate Playground!" }],
     type: "h1",
@@ -560,4 +624,5 @@ const value = normalizeNodeId([
     children: [{ text: "" }],
     type: "p",
   },
-]);
+  ]);
+}

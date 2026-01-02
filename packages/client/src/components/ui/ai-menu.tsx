@@ -34,7 +34,7 @@ import {
   usePluginOption,
 } from "platejs/react";
 
-import { commentPlugin } from "@/components/comment-kit";
+import { commentPlugin } from "@/components/editor/comment-kit";
 import { Button } from "@/components/ui/button";
 import { Command, CommandGroup, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover";

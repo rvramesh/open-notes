@@ -1,6 +1,6 @@
 # Open Notes
 
-*A user-owned, AI-assisted note system for building a second brain.*
+_A user-owned, AI-assisted note system for building a second brain._
 
 ---
 
@@ -29,7 +29,7 @@ Open Notes is both a practical tool and an exploration of human–AI collaborati
 
 ![Open Notes Application](./docs/assets/screenshot.png)
 
-*The Open Notes interface featuring a rich-text editor, sidebar navigation, note organization, and AI-assisted editing capabilities.*
+_The Open Notes interface featuring a rich-text editor, sidebar navigation, note organization, and AI-assisted editing capabilities._
 
 ---
 
@@ -43,6 +43,7 @@ There is no required central server and no enforced AI provider.
 At the core of this philosophy is **Bring Your Own Model / Key**.
 
 This means users are free to decide how intelligence is applied to their notes, including the ability to:
+
 - Stay fully local
 - Use private or self-hosted AI
 - Connect to public AI services
@@ -98,6 +99,7 @@ Over time, Open Notes aims to support:
 - Emergent knowledge graphs built from relationships and context
 
 All enrichment remains:
+
 - Optional
 - User-directed
 - Model-agnostic
@@ -120,6 +122,7 @@ AI remains a tool — not an authority.
 🚧 **Work in Progress**
 
 Open Notes is in early development and active exploration:
+
 - Ideas are still evolving
 - Features may change significantly
 - Documentation will mature alongside the project

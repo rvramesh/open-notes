@@ -21,9 +21,9 @@ import {
 } from "platejs";
 import { useEditorPlugin, useEditorRef, usePluginOption } from "platejs/react";
 
-import { commentPlugin } from "@/components/comment-kit";
-import { type TDiscussion, discussionPlugin } from "@/components/discussion-kit";
-import { suggestionPlugin } from "@/components/suggestion-kit";
+import { commentPlugin } from "@/components/editor/comment-kit";
+import { type TDiscussion, discussionPlugin } from "@/components/editor/discussion-kit";
+import { suggestionPlugin } from "@/components/editor/suggestion-kit";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 

@@ -1,0 +1,1269 @@
+# State Management Plan: Open Notes
+
+## Overview
+
+Open Notes uses explicit, minimal global state modeled via Zustand. State is split into domain stores (persistent) and application/session stores (ephemeral). The architecture prioritizes clarity, immutability, and separation of concerns.
+
+### Core Principles
+
+1. **Notes are first-class domain objects** - All content lives in notes as blocks
+2. **Stores act as local caches** - Persistence is explicit via adapters
+3. **Persistence is explicit and adapter-based** - Storage strategy is pluggable
+4. **AI enrichment is derivative and non-destructive** - Original notes are never overwritten
+5. **Original notes are immutable by AI** - Content blocks remain user-controlled
+
+---
+
+## Store Architecture
+
+| Store | Purpose | Persistent | Location |
+|-------|---------|------------|----------|
+| **notes.store** | Canonical note domain state | Yes | `/src/stores/notes.store.ts` |
+| **editor.store** | Active editing session | No | `/src/stores/editor.store.ts` |
+| **settings.store** | User configuration & prompts | Yes | `/src/stores/settings.store.ts` |
+| **ui.store** | App shell & layout state | No | `/src/stores/ui.store.ts` |
+| *(future)* search.store | Indexing & retrieval | No | TBD |
+| *(future)* ai.store | AI jobs & pipelines | No | TBD |
+
+---
+
+## Shared Types
+
+```typescript
+// Core primitives
+type NoteId = string;
+type BlockId = string;
+type Timestamp = number;
+type Embedding = number[];
+
+// Note ID format: YYYYMMDD-HHMMSS-CCC
+// Example: 20260101-154507-001
+// Properties:
+// - Lexically sortable (string sort = creation order)
+// - Offline-safe (no server coordination needed)
+// - Human-readable
+// - Filename-safe
+```
+
+---
+
+## Block Model
+
+All note content is block-based. Blocks are atomic units of content that can be independently enriched.
+
+```typescript
+interface Block {
+  id: BlockId;
+  type: string; // 'paragraph', 'heading', 'list', 'code', etc.
+  content: unknown; // Block-specific content structure
+  createdAt: Timestamp;
+}
+```
+
+**Block Types Examples:**
+- Plate.js native types: `p`, `h1`, `h2`, `blockquote`, `code_block`, `img`, etc.
+- Custom enrichment types: `ai_summary`, `ai_keypoints`, `ai_entities`
+
+---
+
+## Note Domain Model
+
+```typescript
+interface Note {
+  // Identity
+  id: NoteId;
+  title: string;
+
+  // Timestamps
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+
+  // Content separation
+  contentBlocks: Block[]; // User-authored, immutable by AI
+  enrichmentBlocks: Block[]; // AI-generated, replaceable
+
+  // Optional semantic embeddings (note-level)
+  embeddings?: Embedding[];
+
+  // Classification
+  categories: string[]; // References to Category IDs in settings
+  tags: {
+    user: string[]; // User-applied tags
+    system: string[]; // AI-generated tags
+  };
+}
+```
+
+### Invariants
+
+1. **`contentBlocks` are user-authored and immutable by AI**
+   - AI never modifies these blocks
+   - All user edits go here
+   - Source of truth for note content
+
+2. **`enrichmentBlocks` are AI-generated and replaceable**
+   - Derived from `contentBlocks`
+   - Can be regenerated at any time
+   - Never persisted as source of truth
+
+3. **Embeddings are optional and note-level**
+   - Generated from concatenated content
+   - Used for semantic search
+   - Cached for performance
+
+4. **Categories are user-defined and flat**
+   - No nesting or hierarchy
+   - Each category has an enrichment prompt
+   - Stored in settings, referenced by ID
+
+5. **Tags are flat and may be system- or user-generated**
+   - User tags: manually applied
+   - System tags: extracted by AI
+   - No special meaning or structure
+
+---
+
+## Note Identity & ID Generation
+
+### Note ID Format
+
+```
+YYYYMMDD-HHMMSS-CCC
+```
+
+**Example:** `20260101-154507-001`
+
+**Properties:**
+- **Lexically sortable**: String comparison equals chronological order
+- **Offline-safe**: No server coordination required
+- **Human-readable**: Timestamp is visible
+- **Filename-safe**: No special characters
+- **Collision-resistant**: Per-second counter (CCC)
+
+### Note ID Factory
+
+```typescript
+interface NoteIdFactory {
+  generate(): Promise<NoteId>;
+}
+```
+
+**Responsibilities:**
+- Format timestamp as `YYYYMMDD-HHMMSS`
+- Maintain per-second counter for collision avoidance
+- Reset counter each second
+- Generate lexically sortable IDs
+
+**Implementation Strategy:**
+```typescript
+class TimestampNoteIdFactory implements NoteIdFactory {
+  private lastSecond = 0;
+  private counter = 0;
+
+  async generate(): Promise<NoteId> {
+    const now = Date.now();
+    const currentSecond = Math.floor(now / 1000);
+
+    if (currentSecond !== this.lastSecond) {
+      this.lastSecond = currentSecond;
+      this.counter = 0;
+    } else {
+      this.counter++;
+    }
+
+    const date = new Date(now);
+    const yyyymmdd = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const hhmmss = date.toISOString().slice(11, 19).replace(/:/g, '');
+    const ccc = String(this.counter).padStart(3, '0');
+
+    return `${yyyymmdd}-${hhmmss}-${ccc}`;
+  }
+}
+```
+
+---
+
+## Persistence Adapter Pattern
+
+### Notes Persistence Adapter Interface
+
+```typescript
+interface NotesPersistenceAdapter {
+  fetchAllNotes(): Promise<Note[]>;
+  createNote(note: Note): Promise<void>;
+  updateNote(note: Note): Promise<void>;
+  deleteNote(noteId: NoteId): Promise<void>;
+}
+```
+
+**Adapter Targets:**
+- **Local filesystem** (Electron: Node.js fs module)
+- **IndexedDB** (Browser: Dexie.js or native)
+- **Remote server** (REST API or GraphQL)
+- **Hybrid sync engines** (CRDTs, Operational Transform)
+
+### Example: LocalStorage Adapter
+
+```typescript
+class LocalStorageNotesAdapter implements NotesPersistenceAdapter {
+  private readonly storageKey = 'open-notes:notes';
+
+  async fetchAllNotes(): Promise<Note[]> {
+    const json = localStorage.getItem(this.storageKey);
+    return json ? JSON.parse(json) : [];
+  }
+
+  async createNote(note: Note): Promise<void> {
+    const notes = await this.fetchAllNotes();
+    notes.push(note);
+    localStorage.setItem(this.storageKey, JSON.stringify(notes));
+  }
+
+  async updateNote(note: Note): Promise<void> {
+    const notes = await this.fetchAllNotes();
+    const index = notes.findIndex(n => n.id === note.id);
+    if (index >= 0) {
+      notes[index] = note;
+      localStorage.setItem(this.storageKey, JSON.stringify(notes));
+    }
+  }
+
+  async deleteNote(noteId: NoteId): Promise<void> {
+    const notes = await this.fetchAllNotes();
+    const filtered = notes.filter(n => n.id !== noteId);
+    localStorage.setItem(this.storageKey, JSON.stringify(filtered));
+  }
+}
+```
+
+---
+
+## Notes Store (notes.store.ts)
+
+### Purpose
+
+The notes store is the **canonical domain store** for all note data.
+
+**Responsibilities:**
+- Hold the in-memory cache of notes
+- Coordinate persistence via adapter
+- Enforce domain invariants
+- Expose safe mutation APIs
+- Maintain lexical sort order
+
+**Rules:**
+- Notes are stored as a Record (map) for O(1) lookups
+- Ordered list maintained separately for display
+- All mutations go through actions (no direct state modification)
+- Persistence is synchronous to the store update
+
+---
+
+### Notes Store State
+
+```typescript
+interface NotesStoreState {
+  // Data
+  notes: Record<NoteId, Note>; // Map for fast lookup
+  orderedNoteIds: NoteId[]; // Lexically sorted for display
+
+  // Dependencies (injected)
+  adapter: NotesPersistenceAdapter;
+  idFactory: NoteIdFactory;
+
+  // Loading state
+  isLoading: boolean;
+  error: string | null;
+}
+```
+
+---
+
+### Notes Store Actions
+
+```typescript
+interface NotesStoreActions {
+  // CRUD operations
+  createNote(initialData?: Partial<Note>): Promise<NoteId>;
+  updateNote(
+    id: NoteId,
+    updater: (note: Note) => Note
+  ): Promise<void>;
+  deleteNote(id: NoteId): Promise<void>;
+
+  // Batch operations
+  batchUpdateNotes(
+    updates: Array<[NoteId, (note: Note) => Note]>
+  ): Promise<void>;
+
+  // Enrichment operations
+  replaceEnrichments(
+    id: NoteId,
+    enrichmentBlocks: Block[]
+  ): Promise<void>;
+  clearEnrichments(id: NoteId): Promise<void>;
+
+  // Embeddings
+  setEmbeddings(id: NoteId, embeddings: Embedding[]): Promise<void>;
+  clearEmbeddings(id: NoteId): Promise<void>;
+
+  // Lifecycle
+  hydrate(notes: Note[]): void;
+  refreshFromAdapter(): Promise<void>;
+
+  // Queries (read-only, derived)
+  getNote(id: NoteId): Note | undefined;
+  getNotesByCategory(categoryId: string): Note[];
+  getNotesByTag(tag: string): Note[];
+  getRecentNotes(limit?: number): Note[];
+}
+```
+
+---
+
+### Note Creation Flow
+
+```
+1. Generate NoteId via NoteIdFactory
+   ↓
+2. Create empty note with default structure
+   ↓
+3. Insert into local store (notes + orderedNoteIds)
+   ↓
+4. Persist via adapter.createNote()
+   ↓
+5. Return NoteId to caller
+```
+
+**Implementation:**
+```typescript
+async createNote(initialData?: Partial<Note>): Promise<NoteId> {
+  const id = await get().idFactory.generate();
+  const now = Date.now();
+
+  const note: Note = {
+    id,
+    title: initialData?.title || 'Untitled Note',
+    createdAt: now,
+    updatedAt: now,
+    contentBlocks: initialData?.contentBlocks || [],
+    enrichmentBlocks: [],
+    categories: initialData?.categories || [],
+    tags: initialData?.tags || { user: [], system: [] },
+    ...initialData,
+  };
+
+  // Update local state
+  set(state => ({
+    notes: { ...state.notes, [id]: note },
+    orderedNoteIds: [...state.orderedNoteIds, id].sort(),
+  }));
+
+  // Persist
+  await get().adapter.createNote(note);
+
+  return id;
+}
+```
+
+---
+
+### Note Update Flow
+
+```
+1. Apply immutable update locally via updater function
+   ↓
+2. Update note.updatedAt timestamp
+   ↓
+3. Update local store (notes map)
+   ↓
+4. Persist full note via adapter.updateNote()
+```
+
+**Key Principle:** Notes are persisted as aggregates (entire note object), not as deltas.
+
+**Implementation:**
+```typescript
+async updateNote(
+  id: NoteId,
+  updater: (note: Note) => Note
+): Promise<void> {
+  const currentNote = get().notes[id];
+  if (!currentNote) {
+    throw new Error(`Note ${id} not found`);
+  }
+
+  // Apply update immutably
+  const updatedNote: Note = {
+    ...updater(currentNote),
+    updatedAt: Date.now(),
+  };
+
+  // Update local state
+  set(state => ({
+    notes: { ...state.notes, [id]: updatedNote },
+  }));
+
+  // Persist
+  await get().adapter.updateNote(updatedNote);
+}
+```
+
+---
+
+### Note Delete Flow
+
+```
+1. Remove note from local store (notes + orderedNoteIds)
+   ↓
+2. Delete via adapter.deleteNote()
+```
+
+**Implementation:**
+```typescript
+async deleteNote(id: NoteId): Promise<void> {
+  // Remove from local state
+  set(state => {
+    const { [id]: deleted, ...remainingNotes } = state.notes;
+    return {
+      notes: remainingNotes,
+      orderedNoteIds: state.orderedNoteIds.filter(nid => nid !== id),
+    };
+  });
+
+  // Persist deletion
+  await get().adapter.deleteNote(id);
+}
+```
+
+---
+
+### Hydration (App Startup)
+
+```
+1. Adapter fetches all notes
+   ↓
+2. Store hydrates cache (notes map + orderedNoteIds)
+   ↓
+3. Notes are sorted lexically by NoteId
+```
+
+**Implementation:**
+```typescript
+async refreshFromAdapter(): Promise<void> {
+  set({ isLoading: true, error: null });
+
+  try {
+    const notes = await get().adapter.fetchAllNotes();
+    get().hydrate(notes);
+  } catch (error) {
+    set({ error: error.message, isLoading: false });
+  }
+}
+
+hydrate(notes: Note[]): void {
+  const notesMap: Record<NoteId, Note> = {};
+  const orderedIds: NoteId[] = [];
+
+  // Build map and sorted list
+  notes.forEach(note => {
+    notesMap[note.id] = note;
+    orderedIds.push(note.id);
+  });
+
+  // Lexical sort (string comparison)
+  orderedIds.sort();
+
+  set({
+    notes: notesMap,
+    orderedNoteIds: orderedIds,
+    isLoading: false,
+    error: null,
+  });
+}
+```
+
+---
+
+## Editor Store (editor.store.ts)
+
+### Purpose
+
+Tracks **active editing session state only**. This store is ephemeral and never persisted.
+
+**Responsibilities:**
+- Track which note is open
+- Track dirty state (unsaved changes)
+- Track save indicators (typing, saving, saved)
+- Track view mode (original vs enriched)
+- Track UI state for popovers
+
+**Rules:**
+- Editor store never persists data
+- Dirty state is UI-only
+- Persistence success (from notes store) drives `markSaved()`
+- Store resets when switching notes
+
+---
+
+### Editor Store State
+
+```typescript
+interface EditorStoreState {
+  // Active note
+  activeNoteId?: NoteId;
+
+  // Save state
+  isDirty: boolean;
+  lastSavedAt?: Timestamp;
+  isSaving: boolean;
+  isSaved: boolean; // Temporary "Saved!" indicator
+  isTyping: boolean;
+
+  // View mode
+  viewMode: 'original' | 'enriched';
+
+  // UI state for tag/category popovers
+  popoverStates: {
+    addingTag: boolean;
+    addingCategory: boolean;
+    tagFilterValue: string;
+    categoryFilterValue: string;
+  };
+
+  // Delete confirmation
+  deleteConfirmingNoteId: string | null;
+}
+```
+
+---
+
+### Editor Store Actions
+
+```typescript
+interface EditorStoreActions {
+  // Note management
+  openNote(id: NoteId): void;
+  closeNote(): void;
+
+  // Save state
+  markDirty(): void;
+  markSaving(): void;
+  markSaved(): void;
+  setTyping(isTyping: boolean): void;
+  resetSaveState(): void;
+
+  // View mode
+  setViewMode(mode: 'original' | 'enriched'): void;
+  toggleViewMode(): void;
+
+  // Popovers
+  setAddingTag(adding: boolean): void;
+  setAddingCategory(adding: boolean): void;
+  setTagFilter(value: string): void;
+  setCategoryFilter(value: string): void;
+  resetPopovers(): void;
+
+  // Delete confirmation
+  setDeleteConfirmingNote(noteId: NoteId | null): void;
+
+  // Computed
+  getEditorStatus(): 'idle' | 'typing' | 'saving' | 'saved';
+}
+```
+
+---
+
+### Editor State Lifecycle
+
+**On Note Open:**
+```typescript
+openNote(id: NoteId): void {
+  set({
+    activeNoteId: id,
+    isDirty: false,
+    isSaving: false,
+    isSaved: false,
+    isTyping: false,
+    lastSavedAt: undefined,
+    viewMode: 'original',
+    popoverStates: {
+      addingTag: false,
+      addingCategory: false,
+      tagFilterValue: '',
+      categoryFilterValue: '',
+    },
+    deleteConfirmingNoteId: null,
+  });
+}
+```
+
+**On Content Change:**
+```typescript
+markDirty(): void {
+  set({ isDirty: true, isSaved: false });
+}
+```
+
+**On Save Start:**
+```typescript
+markSaving(): void {
+  set({ isSaving: true, isTyping: false });
+}
+```
+
+**On Save Success:**
+```typescript
+markSaved(): void {
+  set({
+    isDirty: false,
+    isSaving: false,
+    isSaved: true,
+    lastSavedAt: Date.now(),
+  });
+
+  // Auto-hide "Saved!" indicator after 2 seconds
+  setTimeout(() => {
+    set({ isSaved: false });
+  }, 2000);
+}
+```
+
+---
+
+## Settings Store (settings.store.ts)
+
+### Purpose
+
+Stores **user configuration and AI prompts**. This store is persisted.
+
+**Responsibilities:**
+- Store application preferences
+- Manage category definitions with enrichment prompts
+- Configure AI models
+- Persist settings to storage
+
+---
+
+### Category Model
+
+```typescript
+interface Category {
+  id: string;
+  name: string;
+  color: 'rose' | 'blue' | 'purple' | 'green' | 'amber';
+  enrichmentPrompt: string; // Prompt used to enrich notes in this category
+}
+```
+
+---
+
+### Settings Store State
+
+```typescript
+interface SettingsStoreState {
+  // Appearance
+  theme: 'light' | 'dark' | 'system';
+  fontSize: 'small' | 'medium' | 'large';
+  fontFamily: 'system' | 'serif' | 'mono';
+
+  // AI configuration
+  languageModel?: string; // e.g., 'gpt-4', 'claude-3-opus'
+  embeddingModel?: string; // e.g., 'text-embedding-3-small'
+  apiKey?: string; // Encrypted or environment-based
+
+  // Categories
+  categories: Category[];
+
+  // AI prompts (global defaults)
+  genericEnrichmentPrompt: string;
+  categoryRecognitionPrompt: string; // Prompt to classify notes into categories
+
+  // Editor preferences
+  editorSettings: {
+    autoSave: boolean;
+    autoSaveInterval: number; // ms
+    spellCheck: boolean;
+    wordWrap: boolean;
+  };
+
+  // Persistence adapter reference
+  adapter?: SettingsPersistenceAdapter;
+}
+```
+
+---
+
+### Settings Store Actions
+
+```typescript
+interface SettingsStoreActions {
+  // Appearance
+  updateTheme(theme: SettingsStoreState['theme']): void;
+  updateFontSize(size: SettingsStoreState['fontSize']): void;
+  updateFontFamily(family: SettingsStoreState['fontFamily']): void;
+
+  // AI configuration
+  updateLanguageModel(model: string): void;
+  updateEmbeddingModel(model: string): void;
+  updateApiKey(apiKey: string): void;
+
+  // Categories
+  createCategory(name: string, color: Category['color'], prompt: string): string;
+  updateCategory(id: string, updates: Partial<Category>): void;
+  deleteCategory(id: string): void;
+  getCategory(id: string): Category | undefined;
+  getCategoryByName(name: string): Category | undefined;
+
+  // Prompts
+  updateGenericEnrichmentPrompt(prompt: string): void;
+  updateCategoryRecognitionPrompt(prompt: string): void;
+
+  // Editor settings
+  updateEditorSetting(
+    key: keyof SettingsStoreState['editorSettings'],
+    value: boolean | number
+  ): void;
+
+  // Lifecycle
+  save(): Promise<void>;
+  load(): Promise<void>;
+  resetToDefaults(): void;
+}
+```
+
+---
+
+### Settings Persistence
+
+Settings are persisted automatically on mutation:
+
+```typescript
+updateTheme(theme: SettingsStoreState['theme']): void {
+  set({ theme });
+  get().save(); // Auto-persist
+}
+```
+
+**Settings Adapter:**
+```typescript
+interface SettingsPersistenceAdapter {
+  save(settings: SettingsStoreState): Promise<void>;
+  load(): Promise<SettingsStoreState | null>;
+}
+```
+
+---
+
+## UI Store (ui.store.ts)
+
+### Purpose
+
+Manages **ephemeral application shell and layout state**. This store is not persisted.
+
+**Responsibilities:**
+- Track active pane/view
+- Control sidebar visibility
+- Manage modal states
+- Handle toast notifications
+
+**Rules:**
+- No domain data
+- No persistence
+- Fully disposable on app restart
+
+---
+
+### UI Store State
+
+```typescript
+interface UIStoreState {
+  // Layout
+  activePane: 'notes' | 'editor' | 'settings';
+  isSidebarCollapsed: boolean;
+
+  // Modals
+  modals: {
+    settingsOpen: boolean;
+    deleteConfirmOpen: boolean;
+    exportOpen: boolean;
+    aboutOpen: boolean;
+  };
+
+  // Settings dialog context
+  settingsContext: {
+    preSelectedTab?: 'ai' | 'categories' | 'appearance' | 'about';
+    preFilledValue?: string; // Pre-fill category name when creating from editor
+  };
+
+  // Toasts
+  toasts: Array<{
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info';
+    createdAt: Timestamp;
+  }>;
+}
+```
+
+---
+
+### UI Store Actions
+
+```typescript
+interface UIStoreActions {
+  // Layout
+  setActivePane(pane: UIStoreState['activePane']): void;
+  toggleSidebar(): void;
+  setSidebarCollapsed(collapsed: boolean): void;
+
+  // Modals
+  openSettings(tab?: string, prefill?: string): void;
+  closeSettings(): void;
+  openDeleteConfirm(): void;
+  closeDeleteConfirm(): void;
+  openExport(): void;
+  closeExport(): void;
+  openAbout(): void;
+  closeAbout(): void;
+
+  // Toasts
+  showToast(message: string, type: 'success' | 'error' | 'info'): void;
+  dismissToast(id: string): void;
+  clearToasts(): void;
+}
+```
+
+---
+
+## AI Enrichment Lifecycle
+
+### Enrichment Trigger Flow
+
+```
+1. User edits note content
+   ↓
+2. Content auto-saves after debounce (1s)
+   ↓
+3. Save triggers enrichment job (if enabled)
+   ↓
+4. AI processes note.contentBlocks
+   ↓
+5. AI generates enrichmentBlocks
+   ↓
+6. Store replaces note.enrichmentBlocks
+   ↓
+7. Editor can toggle between original and enriched view
+```
+
+### Enrichment Principles
+
+1. **Triggered after debounced save**
+   - Avoid enriching on every keystroke
+   - Wait for user to finish editing
+
+2. **Operates on note snapshots**
+   - AI receives immutable copy of content
+   - Original note never modified by AI
+
+3. **Produces new enrichment blocks**
+   - AI output is structured as blocks
+   - Blocks match Plate.js schema
+
+4. **Replaces existing enrichment blocks**
+   - Old enrichments are discarded
+   - New enrichments fully replace old
+
+5. **Never modifies original content**
+   - `contentBlocks` remain unchanged
+   - User retains full control
+
+---
+
+### Enrichment Block Examples
+
+**Summary Block:**
+```typescript
+{
+  id: 'enrich-001',
+  type: 'ai_summary',
+  content: {
+    text: 'This note discusses...',
+    model: 'gpt-4',
+    generatedAt: 1735776000000,
+  },
+  createdAt: 1735776000000,
+}
+```
+
+**Key Points Block:**
+```typescript
+{
+  id: 'enrich-002',
+  type: 'ai_keypoints',
+  content: {
+    points: [
+      'Main topic focuses on...',
+      'Emphasis on...',
+    ],
+    model: 'gpt-4',
+    generatedAt: 1735776000000,
+  },
+  createdAt: 1735776000000,
+}
+```
+
+---
+
+## Future Stores
+
+### Search Store (search.store.ts)
+
+**Purpose:** Handle full-text search and semantic search indexing.
+
+**State:**
+- Search query
+- Search results
+- Active filters (tags, categories, date range)
+- Search mode (fullText, semantic, hybrid)
+
+**Status:** Not implemented. Placeholder for Phase 3+.
+
+---
+
+### AI Store (ai.store.ts)
+
+**Purpose:** Manage AI job queue and pipeline status.
+
+**State:**
+- Active enrichment jobs
+- Job queue
+- Job progress tracking
+- Error handling
+
+**Status:** Not implemented. Placeholder for Phase 4+.
+
+---
+
+## Implementation Roadmap
+
+### Phase 1: Core Domain (Week 1)
+
+**Goal:** Get notes CRUD working with persistence.
+
+- [ ] Create `NoteIdFactory` implementation
+- [ ] Create `LocalStorageNotesAdapter`
+- [ ] Implement `notes.store.ts` (state + CRUD actions)
+- [ ] Add hydration on app startup
+- [ ] Test note creation, update, deletion
+- [ ] Verify lexical sorting of note IDs
+
+### Phase 2: Editor Integration (Week 1-2)
+
+**Goal:** Connect editor to notes store.
+
+- [ ] Create `editor.store.ts`
+- [ ] Migrate NoteEditor component to use editor store
+- [ ] Implement auto-save with debounce
+- [ ] Add save indicators (typing, saving, saved)
+- [ ] Test editor state lifecycle
+
+### Phase 3: Settings & Categories (Week 2)
+
+**Goal:** User preferences and category management.
+
+- [ ] Create `settings.store.ts`
+- [ ] Implement category CRUD
+- [ ] Add settings persistence adapter
+- [ ] Create settings UI in SettingsDialog
+- [ ] Test category prompts
+
+### Phase 4: UI & Modals (Week 2)
+
+**Goal:** Application shell and modal management.
+
+- [ ] Create `ui.store.ts`
+- [ ] Migrate modal states from components
+- [ ] Implement toast notification system
+- [ ] Test sidebar collapse/expand
+
+### Phase 5: Enrichment Pipeline (Week 3-4)
+
+**Goal:** AI enrichment integration.
+
+- [ ] Implement enrichment trigger on save
+- [ ] Create enrichment block generators
+- [ ] Add enrichment view toggle in editor
+- [ ] Test enrichment replacement flow
+- [ ] Add error handling for AI failures
+
+### Phase 6: Advanced Features (Week 4+)
+
+**Goal:** Search, embeddings, and optimization.
+
+- [ ] Implement `search.store.ts` (placeholder)
+- [ ] Add semantic embedding generation
+- [ ] Implement semantic search
+- [ ] Add ai.store.ts for job management
+- [ ] Optimize performance for large note collections
+
+---
+
+## Testing Strategy
+
+### Unit Tests (Per Store)
+
+Test each store in isolation:
+
+```typescript
+// notes.store.test.ts
+describe('NotesStore', () => {
+  let store: ReturnType<typeof useNotesStore>;
+  let mockAdapter: MockNotesAdapter;
+
+  beforeEach(() => {
+    mockAdapter = new MockNotesAdapter();
+    store = createNotesStore(mockAdapter);
+  });
+
+  it('should create a note with lexically sorted ID', async () => {
+    const id = await store.createNote({ title: 'Test' });
+    expect(id).toMatch(/^\d{8}-\d{6}-\d{3}$/);
+    expect(store.getNote(id)).toBeDefined();
+  });
+
+  it('should update note and increment updatedAt', async () => {
+    const id = await store.createNote({ title: 'Original' });
+    const original = store.getNote(id)!;
+
+    await store.updateNote(id, note => ({ ...note, title: 'Updated' }));
+
+    const updated = store.getNote(id)!;
+    expect(updated.title).toBe('Updated');
+    expect(updated.updatedAt).toBeGreaterThan(original.updatedAt);
+  });
+
+  it('should delete note', async () => {
+    const id = await store.createNote();
+    await store.deleteNote(id);
+    expect(store.getNote(id)).toBeUndefined();
+  });
+});
+```
+
+---
+
+### Integration Tests
+
+Test cross-store interactions:
+
+```typescript
+// note-lifecycle.integration.test.ts
+describe('Note Lifecycle Integration', () => {
+  it('should handle full create-edit-save-delete flow', async () => {
+    const notesStore = useNotesStore();
+    const editorStore = useEditorStore();
+
+    // Create
+    const id = await notesStore.createNote({ title: 'Test Note' });
+
+    // Open in editor
+    editorStore.openNote(id);
+    expect(editorStore.activeNoteId).toBe(id);
+
+    // Edit
+    editorStore.markDirty();
+    expect(editorStore.isDirty).toBe(true);
+
+    // Save
+    editorStore.markSaving();
+    await notesStore.updateNote(id, note => ({
+      ...note,
+      title: 'Updated Title',
+    }));
+    editorStore.markSaved();
+
+    expect(editorStore.isDirty).toBe(false);
+    expect(notesStore.getNote(id)?.title).toBe('Updated Title');
+
+    // Delete
+    await notesStore.deleteNote(id);
+    expect(notesStore.getNote(id)).toBeUndefined();
+  });
+});
+```
+
+---
+
+## Migration Strategy
+
+### Current State (Before Migration)
+
+- NotesWorkspace: 12+ `useState` calls
+- NoteEditor: 13+ `useState` calls
+- Props drilling through multiple levels
+- No persistence strategy
+- Mock data in components
+
+### Step 1: Create Stores (No Breaking Changes)
+
+1. Create all store files in `/src/stores`
+2. Implement stores with mock adapters
+3. Add unit tests
+4. Do NOT remove existing component state yet
+
+### Step 2: Create Compatibility Hooks
+
+```typescript
+// hooks/useNotesCompat.ts
+export const useNotesCompat = () => {
+  const notes = useNotesStore(state => Object.values(state.notes));
+  const createNote = useNotesStore(state => state.createNote);
+  const updateNote = useNotesStore(state => state.updateNote);
+  const deleteNote = useNotesStore(state => state.deleteNote);
+
+  return {
+    notes,
+    setNotes: (updater) => {
+      // Adapt old setter API to new store API
+    },
+    onCreateNote: createNote,
+    onUpdateNote: updateNote,
+    onDeleteNote: deleteNote,
+  };
+};
+```
+
+### Step 3: Migrate Components One-by-One
+
+1. Update NotesWorkspace to use `useNotesCompat()`
+2. Test thoroughly
+3. Update NoteEditor to use `useEditorStore()`
+4. Test thoroughly
+5. Remove compatibility hooks
+6. Clean up old `useState` calls
+
+### Step 4: Add Persistence
+
+1. Implement real persistence adapters
+2. Replace mock adapters
+3. Test data persistence across app restarts
+4. Add migration scripts if needed
+
+---
+
+## Performance Optimization
+
+### Selector Memoization
+
+Use shallow equality checks for derived state:
+
+```typescript
+// ❌ Bad: Creates new object every render
+const state = useNotesStore(state => ({
+  notes: state.notes,
+  orderedIds: state.orderedNoteIds,
+}));
+
+// ✅ Good: Use shallow selector
+const state = useNotesStore(
+  state => ({
+    notes: state.notes,
+    orderedIds: state.orderedNoteIds,
+  }),
+  shallow
+);
+```
+
+### Batch Updates
+
+Avoid triggering multiple store updates:
+
+```typescript
+// ❌ Bad: Multiple store updates
+notes.forEach(note => updateNote(note.id, updates));
+
+// ✅ Good: Single batch update
+await batchUpdateNotes(notes.map(note => [note.id, updates]));
+```
+
+### Store Slicing (Future)
+
+For very large note collections (10,000+ notes), consider:
+- Virtual scrolling in UI
+- Lazy loading notes on demand
+- Separate stores for archived vs. active notes
+
+---
+
+## Guiding Principles (Summary)
+
+1. **Notes are human truth** - User content is sacrosanct
+2. **Enrichment is optional intelligence** - AI adds value but never overwrites
+3. **Stores are caches, not prisons** - Data can move freely via adapters
+4. **Blocks are atomic** - Content and enrichment live as independent blocks
+5. **IDs are timestamps** - Lexical sorting = chronological order
+6. **Persistence is explicit** - No magic; adapters make it clear
+7. **State is minimal** - Only what's necessary, nothing more
+8. **Immutability is key** - Updates never mutate, always replace
+
+---
+
+## Quick Reference
+
+### When to use which store?
+
+| Concern | Store |
+|---------|-------|
+| Note CRUD | notes.store |
+| Note content blocks | notes.store |
+| AI enrichment blocks | notes.store |
+| Active note ID | editor.store |
+| Save indicators | editor.store |
+| View mode toggle | editor.store |
+| Categories & prompts | settings.store |
+| User theme | settings.store |
+| Modal open/close | ui.store |
+| Sidebar collapsed | ui.store |
+| Toast messages | ui.store |
+
+### File Structure
+
+```
+src/
+├── stores/
+│   ├── notes.store.ts
+│   ├── editor.store.ts
+│   ├── settings.store.ts
+│   ├── ui.store.ts
+│   └── index.ts (re-exports)
+├── adapters/
+│   ├── NotesPersistenceAdapter.ts (interface)
+│   ├── LocalStorageNotesAdapter.ts
+│   ├── SettingsPersistenceAdapter.ts
+│   └── LocalStorageSettingsAdapter.ts
+├── lib/
+│   ├── NoteIdFactory.ts
+│   └── types.ts (shared types)
+└── components/
+    ├── notes-workspace.tsx
+    ├── note-editor.tsx
+    └── ...
+```
+
+---
+
+## Conclusion
+
+This state management architecture provides:
+
+✅ **Clarity** - Stores have clear, single responsibilities  
+✅ **Testability** - Pure functions, mockable adapters  
+✅ **Extensibility** - Easy to add search, AI, sync stores later  
+✅ **Performance** - Optimized selectors, batch updates  
+✅ **Type Safety** - Full TypeScript support  
+✅ **Persistence** - Explicit, adapter-based  
+✅ **Immutability** - AI never overwrites user content  
+✅ **Simplicity** - Minimal, explicit global state  
+
+The architecture is production-ready and scales from a single-user desktop app to a cloud-synced, multi-user collaborative platform.

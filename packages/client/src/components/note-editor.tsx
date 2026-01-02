@@ -1,6 +1,5 @@
 "use client";
 
-import { LexicalEditor } from "@/components/lexical-editor";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +35,7 @@ import {
 } from "lucide-react";
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PlateEditor } from "./plate-editor";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -394,7 +394,7 @@ export function NoteEditor({
               </div>
             </div>
           ) : (
-            <LexicalEditor content={content} onChange={handleContentChange} />
+            <PlateEditor content={content} onChange={handleContentChange} />
           )}
         </div>
 

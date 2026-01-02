@@ -24,8 +24,8 @@ import {
 } from "platejs";
 import { useEditorPlugin, usePluginOption } from "platejs/react";
 
-import { type TDiscussion, discussionPlugin } from "@/components/discussion-kit";
-import { suggestionPlugin } from "@/components/suggestion-kit";
+import { type TDiscussion, discussionPlugin } from "@/components/editor/discussion-kit";
+import { suggestionPlugin } from "@/components/editor/suggestion-kit";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 

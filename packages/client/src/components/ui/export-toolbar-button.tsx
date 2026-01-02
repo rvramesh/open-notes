@@ -10,7 +10,7 @@ import { createSlateEditor } from "platejs";
 import { useEditorRef } from "platejs/react";
 import { serializeHtml } from "platejs/static";
 
-import { BaseEditorKit } from "@/components/editor-base-kit";
+import { BaseEditorKit } from "@/components/editor/editor-base-kit";
 import {
   DropdownMenu,
   DropdownMenuContent,

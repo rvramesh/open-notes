@@ -35,6 +35,7 @@ npm install
 ```
 
 This will automatically install dependencies for all workspaces:
+
 - `packages/client` — Vite React frontend
 - `packages/server` — Fastify backend server
 - `packages/electron` — Electron main process
@@ -42,11 +43,13 @@ This will automatically install dependencies for all workspaces:
 ### 3. Post-Install
 
 The postinstall hook automatically runs:
+
 ```bash
 npm run check-licenses
 ```
 
 This generates:
+
 - `THIRD_PARTY_LICENSES.md` — Full license documentation
 - `packages/client/public/libraries.json` — License data for the about dialog
 
@@ -61,6 +64,7 @@ npm run dev
 ```
 
 This will:
+
 - Start the **Vite React client** on `http://localhost:5174` (or next available port)
 - Start the **Fastify server** on `http://127.0.0.1:3000`
 - Start the **Electron** main process
@@ -70,15 +74,15 @@ The application should open automatically in an Electron window.
 
 ### Available Development Commands
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm run build` | Build the client for production |
-| `npm run build:all` | Build client, electron, and server |
-| `npm run lint` | Run ESLint checks |
-| `npm run preview` | Preview the production build locally |
-| `npm run format` | Format code with Prettier and organize imports |
-| `npm run format:check` | Check if files are properly formatted |
+| Command                  | Description                                     |
+| ------------------------ | ----------------------------------------------- |
+| `npm run dev`            | Start development server with hot reload        |
+| `npm run build`          | Build the client for production                 |
+| `npm run build:all`      | Build client, electron, and server              |
+| `npm run lint`           | Run ESLint checks                               |
+| `npm run preview`        | Preview the production build locally            |
+| `npm run format`         | Format code with Prettier and organize imports  |
+| `npm run format:check`   | Check if files are properly formatted           |
 | `npm run check-licenses` | Audit dependencies and generate license reports |
 
 ---
@@ -145,9 +149,19 @@ open-notes/
 
 ## Configuration Files
 
+### `eslint.config.js`
+
+Modern ESLint 9 flat configuration (packages/client/):
+- Uses the new flat config format (replaces `.eslintrc.cjs`)
+- TypeScript support with `typescript-eslint` v8
+- React Hooks rules with `eslint-plugin-react-hooks` v5
+- React Refresh validation
+- Configured to ignore dist folders and node_modules
+
 ### `.prettierrc.json`
 
 Code formatting configuration:
+
 - 2-space indentation
 - Semicolons enabled (`semi: true`)
 - Single quotes disabled (uses double quotes)
@@ -156,6 +170,7 @@ Code formatting configuration:
 ### `.editorconfig`
 
 Editor configuration for consistent formatting across different editors:
+
 - UTF-8 charset
 - LF line endings
 - 2-space indentation for code files
@@ -163,6 +178,7 @@ Editor configuration for consistent formatting across different editors:
 ### `tsconfig.json`
 
 TypeScript configuration in `packages/client/`:
+
 - Path alias: `@` → `./src`
 - Target: ES2020
 - Module: ESNext
@@ -172,6 +188,7 @@ TypeScript configuration in `packages/client/`:
 ## Technology Stack
 
 ### Frontend (Client)
+
 - **Vite** — Fast build tool and dev server
 - **React 18** — UI library
 - **TypeScript** — Type safety
@@ -181,14 +198,23 @@ TypeScript configuration in `packages/client/`:
 - **Lucide React** — Icon library
 
 ### Backend (Server)
+
 - **Fastify** — Fast web framework
 - **TypeScript** — Type safety
 
 ### Desktop (Electron)
+
 - **Electron** — Cross-platform desktop framework
 - **electron-builder** — Build and package Electron apps
 
 ### Development Tools
+
+- **ESLint 9** — Code quality checks with flat config
+- **Prettier** — Code formatter with import organization
+- **TypeScript** — Type checking
+
+### Development Tools
+
 - **Prettier** — Code formatter with import organization
 - **ESLint** — Code quality checks
 - **TypeScript** — Type checking
@@ -204,6 +230,7 @@ npm run format
 ```
 
 This will:
+
 - Format all code files with Prettier
 - Organize and remove unused imports
 - Fix code style issues
@@ -215,6 +242,7 @@ npm run check-licenses
 ```
 
 This will:
+
 - Scan all dependencies in all workspaces
 - Validate licenses against approved list
 - Generate or update `THIRD_PARTY_LICENSES.md`
@@ -287,6 +315,7 @@ npm run build:all
 ```
 
 This generates:
+
 - `packages/client/dist/` — Optimized React app
 - `packages/electron/dist-electron/` — Electron bundles
 - `packages/server/dist/` — Server bundle (if applicable)
@@ -294,6 +323,7 @@ This generates:
 ### Package for Distribution
 
 The build process includes `electron-builder` which generates:
+
 - Windows installers
 - macOS DMG/APP
 - Linux packages

@@ -16,7 +16,6 @@ This document lists all third-party dependencies and their licenses.
 
 ### MIT-Compatible Licenses ✅
 
-
 #### Apache-2.0 (4)
 
 - **@ai-sdk/react** (v2.0.28)
