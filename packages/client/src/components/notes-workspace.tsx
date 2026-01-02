@@ -5,33 +5,8 @@ import { NoteEditor } from "@/components/note-editor";
 import { NotesTree } from "@/components/notes-tree";
 import { SettingsDialog } from "@/components/settings-dialog";
 import type { Category, Tag, Note } from "@/lib/types";
-import { useNotesStore } from "@/lib/store";
+import { useNotesStore, useCategoriesStore, useTagsStore } from "@/lib/store";
 import { useState, useEffect } from "react";
-
-// Mock data
-const mockCategories: Category[] = [
-  {
-    id: "1",
-    name: "Personal",
-    color: "rose",
-    aiPrompt: "Enhance this personal note with insights.",
-  },
-  { id: "2", name: "Work", color: "blue", aiPrompt: "Summarize work-related tasks." },
-  { id: "3", name: "Ideas", color: "purple", aiPrompt: "Expand on creative ideas." },
-  {
-    id: "4",
-    name: "Research",
-    color: "green",
-    aiPrompt: "Provide research context and connections.",
-  },
-];
-
-const mockTags: Tag[] = [
-  { id: "1", name: "Urgent", color: "rose" },
-  { id: "2", name: "Planning", color: "blue" },
-  { id: "3", name: "Creative", color: "purple" },
-  { id: "4", name: "Technical", color: "green" },
-];
 
 export function NotesWorkspace() {
   // Store state - use stable selectors
@@ -44,14 +19,28 @@ export function NotesWorkspace() {
   const getNote = useNotesStore((state) => state.getNote);
   const getNotesByCategory = useNotesStore((state) => state.getNotesByCategory);
   const getNotesByTag = useNotesStore((state) => state.getNotesByTag);
+
+  // Categories store
+  const categoriesMap = useCategoriesStore((state) => state.categories);
+  const createCategory = useCategoriesStore((state) => state.createCategory);
+  const updateCategory = useCategoriesStore((state) => state.updateCategory);
+  const deleteCategory = useCategoriesStore((state) => state.deleteCategory);
+  const refreshCategories = useCategoriesStore((state) => state.refreshFromAdapter);
+  const categories = Object.values(categoriesMap);
+
+  // Tags store
+  const tagsMap = useTagsStore((state) => state.tags);
+  const createTag = useTagsStore((state) => state.createTag);
+  const updateTag = useTagsStore((state) => state.updateTag);
+  const deleteTag = useTagsStore((state) => state.deleteTag);
+  const refreshTags = useTagsStore((state) => state.refreshFromAdapter);
+  const tags = Object.values(tagsMap);
   
   // Derive notes array from the map (stable reference via orderedNoteIds)
   const notes = orderedNoteIds.map(id => notesMap[id]).filter((note): note is Note => note !== undefined);
 
   // Local UI state
   const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
-  const [tags, setTags] = useState<Tag[]>(mockTags);
-  const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [isLeftBarCollapsed, setIsLeftBarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsPreSelect, setSettingsPreSelect] = useState<"ai" | "categories" | undefined>(
@@ -60,13 +49,18 @@ export function NotesWorkspace() {
   const [settingsPreFillCategory, setSettingsPreFillCategory] = useState<string | undefined>(
     undefined
   );
+  const [pendingCategoryNoteId, setPendingCategoryNoteId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  // Load notes on mount
+  // Load notes, categories, and tags on mount
   useEffect(() => {
-    refreshFromAdapter().then(() => {
+    Promise.all([
+      refreshFromAdapter(),
+      refreshCategories(),
+      refreshTags(),
+    ]).then(() => {
       // Select first note if available
       if (orderedNoteIds.length > 0 && !selectedNoteId) {
         setSelectedNoteId(orderedNoteIds[0]);
@@ -94,8 +88,8 @@ export function NotesWorkspace() {
     setSelectedNoteId(noteId);
   };
 
-  const handleRemoveTag = (tagId: string) => {
-    setTags((prev) => prev.filter((tag) => tag.id !== tagId));
+  const handleRemoveTag = async (tagId: string) => {
+    await deleteTag(tagId);
     // Remove tag from all notes
     notes.forEach((note) => {
       if (note.tags.user.includes(tagId)) {
@@ -110,8 +104,8 @@ export function NotesWorkspace() {
     });
   };
 
-  const handleRemoveCategory = (categoryId: string) => {
-    setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
+  const handleRemoveCategory = async (categoryId: string) => {
+    await deleteCategory(categoryId);
     // Remove category from all notes
     notes.forEach((note) => {
       if (note.categories.includes(categoryId)) {
@@ -135,13 +129,28 @@ export function NotesWorkspace() {
   const handleOpenSettingsWithCategory = (categoryName: string) => {
     setSettingsPreSelect("categories");
     setSettingsPreFillCategory(categoryName);
+    setPendingCategoryNoteId(selectedNoteId); // Track which note needs this category
     setIsSettingsOpen(true);
+  };
+
+  const handleCategoryCreated = async (categoryId: string) => {
+    // Add the newly created category to the pending note
+    if (pendingCategoryNoteId) {
+      const note = getNote(pendingCategoryNoteId);
+      if (note && !note.categories.includes(categoryId)) {
+        await updateNote(pendingCategoryNoteId, (n) => ({
+          ...n,
+          categories: [...n.categories, categoryId],
+        }));
+      }
+    }
   };
 
   const handleCloseSettings = () => {
     setIsSettingsOpen(false);
     setSettingsPreSelect(undefined);
     setSettingsPreFillCategory(undefined);
+    setPendingCategoryNoteId(null);
   };
 
   const handleSearch = (query: string) => {
@@ -231,8 +240,8 @@ export function NotesWorkspace() {
           tags={tags}
           categories={categories}
           onUpdateNote={handleUpdateNote}
-          onAddTag={(tag) => setTags([...tags, tag])}
-          onAddCategory={(category) => setCategories([...categories, category])}
+          onAddTag={async (tag) => await createTag(tag.name)}
+          onAddCategory={async (category) => await createCategory(category.name, category.aiPrompt)}
           onRemoveTag={handleRemoveTag}
           onRemoveCategory={handleRemoveCategory}
           onOpenSettingsWithCategory={handleOpenSettingsWithCategory}
@@ -246,7 +255,7 @@ export function NotesWorkspace() {
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
         categories={categories}
-        onUpdateCategories={setCategories}
+        onCategoryCreated={handleCategoryCreated}
         preSelectTab={settingsPreSelect}
         preFillCategoryName={settingsPreFillCategory}
       />

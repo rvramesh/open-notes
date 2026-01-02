@@ -56,11 +56,25 @@ interface NoteEditorProps {
 
 const tagColorClasses = {
   rose: "bg-rose-100 text-rose-700 hover:bg-rose-200 dark:bg-rose-950/30 dark:text-rose-300",
+  pink: "bg-pink-100 text-pink-700 hover:bg-pink-200 dark:bg-pink-950/30 dark:text-pink-300",
+  fuchsia: "bg-fuchsia-100 text-fuchsia-700 hover:bg-fuchsia-200 dark:bg-fuchsia-950/30 dark:text-fuchsia-300",
+  purple: "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-950/30 dark:text-purple-300",
+  violet: "bg-violet-100 text-violet-700 hover:bg-violet-200 dark:bg-violet-950/30 dark:text-violet-300",
+  indigo: "bg-indigo-100 text-indigo-700 hover:bg-indigo-200 dark:bg-indigo-950/30 dark:text-indigo-300",
   blue: "bg-blue-100 text-blue-700 hover:bg-blue-200 dark:bg-blue-950/30 dark:text-blue-300",
-  purple:
-    "bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-950/30 dark:text-purple-300",
+  sky: "bg-sky-100 text-sky-700 hover:bg-sky-200 dark:bg-sky-950/30 dark:text-sky-300",
+  cyan: "bg-cyan-100 text-cyan-700 hover:bg-cyan-200 dark:bg-cyan-950/30 dark:text-cyan-300",
+  teal: "bg-teal-100 text-teal-700 hover:bg-teal-200 dark:bg-teal-950/30 dark:text-teal-300",
+  emerald: "bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300",
   green: "bg-green-100 text-green-700 hover:bg-green-200 dark:bg-green-950/30 dark:text-green-300",
+  lime: "bg-lime-100 text-lime-700 hover:bg-lime-200 dark:bg-lime-950/30 dark:text-lime-300",
+  yellow: "bg-yellow-100 text-yellow-700 hover:bg-yellow-200 dark:bg-yellow-950/30 dark:text-yellow-300",
   amber: "bg-amber-100 text-amber-700 hover:bg-amber-200 dark:bg-amber-950/30 dark:text-amber-300",
+  orange: "bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-950/30 dark:text-orange-300",
+  red: "bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-950/30 dark:text-red-300",
+  warmGray: "bg-stone-100 text-stone-700 hover:bg-stone-200 dark:bg-stone-950/30 dark:text-stone-300",
+  coolGray: "bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-950/30 dark:text-gray-300",
+  slate: "bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-slate-950/30 dark:text-slate-300",
 };
 
 export function NoteEditor({
@@ -88,6 +102,8 @@ export function NoteEditor({
   const [newCategoryName, setNewCategoryName] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(-1);
+  const [selectedTagIndex, setSelectedTagIndex] = useState(-1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const [hasChanges, setHasChanges] = useState(false);
@@ -345,7 +361,32 @@ export function NoteEditor({
         cat.name.toLowerCase().includes(categoryFilter.toLowerCase())
     );
   }, [categories, categoryFilter, note?.categories]);
+  // Auto-select when there's only one option
+  useEffect(() => {
+    if (isAddingCategory) {
+      if (filteredCategories.length === 1) {
+        setSelectedCategoryIndex(0);
+      } else if (filteredCategories.length === 0 && categoryFilter.trim()) {
+        // Select the "Add" option
+        setSelectedCategoryIndex(0);
+      } else {
+        setSelectedCategoryIndex(-1);
+      }
+    }
+  }, [filteredCategories, categoryFilter, isAddingCategory]);
 
+  useEffect(() => {
+    if (isAddingTag) {
+      if (filteredTags.length === 1) {
+        setSelectedTagIndex(0);
+      } else if (filteredTags.length === 0 && tagFilter.trim()) {
+        // Select the "Add" option
+        setSelectedTagIndex(0);
+      } else {
+        setSelectedTagIndex(-1);
+      }
+    }
+  }, [filteredTags, tagFilter, isAddingTag]);
   const handleCategoryClick = (categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
       onSearchByCategory(categoryId);
@@ -561,7 +602,10 @@ export function NoteEditor({
                 open={isAddingCategory}
                 onOpenChange={(open) => {
                   setIsAddingCategory(open);
-                  if (!open) setCategoryFilter("");
+                  if (!open) {
+                    setCategoryFilter("");
+                    setSelectedCategoryIndex(-1);
+                  }
                 }}
               >
                 <PopoverTrigger asChild>
@@ -576,22 +620,53 @@ export function NoteEditor({
                     </div>
                     <Input
                       value={categoryFilter}
-                      onChange={(e) => setCategoryFilter(e.target.value)}
+                      onChange={(e) => {
+                        setCategoryFilter(e.target.value);
+                        setSelectedCategoryIndex(-1);
+                      }}
+                      onKeyDown={(e) => {
+                        const maxIndex = filteredCategories.length > 0 ? filteredCategories.length - 1 : 0;
+                        
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSelectedCategoryIndex((prev) => Math.min(prev + 1, maxIndex));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSelectedCategoryIndex((prev) => Math.max(prev - 1, -1));
+                        } else if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (filteredCategories.length > 0 && selectedCategoryIndex >= 0) {
+                            // Select existing category
+                            handleToggleCategory(filteredCategories[selectedCategoryIndex].id);
+                            setIsAddingCategory(false);
+                            setCategoryFilter("");
+                            setSelectedCategoryIndex(-1);
+                          } else if (categoryFilter.trim() && filteredCategories.length === 0) {
+                            // Add new category
+                            handleAddCategoryViaSettings();
+                            setSelectedCategoryIndex(-1);
+                          }
+                        }
+                      }}
                       placeholder="Search or add category..."
                       className="h-8 text-sm"
                       autoFocus
                     />
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {filteredCategories.length > 0 ? (
-                        filteredCategories.map((category) => (
+                        filteredCategories.map((category, index) => (
                           <button
                             key={category.id}
                             onClick={() => {
                               handleToggleCategory(category.id);
                               setIsAddingCategory(false);
                               setCategoryFilter("");
+                              setSelectedCategoryIndex(-1);
                             }}
-                            className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors"
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
+                              selectedCategoryIndex === index && "bg-accent"
+                            )}
                           >
                             {category.name}
                           </button>
@@ -599,7 +674,10 @@ export function NoteEditor({
                       ) : categoryFilter.trim() ? (
                         <button
                           onClick={handleAddCategoryViaSettings}
-                          className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium"
+                          className={cn(
+                            "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
+                            selectedCategoryIndex === 0 && "bg-accent"
+                          )}
                         >
                           <Plus className="h-3.5 w-3.5 inline mr-2" />
                           Add Category "{categoryFilter}"
@@ -646,7 +724,10 @@ export function NoteEditor({
                 open={isAddingTag}
                 onOpenChange={(open) => {
                   setIsAddingTag(open);
-                  if (!open) setTagFilter("");
+                  if (!open) {
+                    setTagFilter("");
+                    setSelectedTagIndex(-1);
+                  }
                 }}
               >
                 <PopoverTrigger asChild>
@@ -659,10 +740,32 @@ export function NoteEditor({
                     <div className="text-xs font-medium text-muted-foreground mb-2">Add Tag</div>
                     <Input
                       value={tagFilter}
-                      onChange={(e) => setTagFilter(e.target.value)}
+                      onChange={(e) => {
+                        setTagFilter(e.target.value);
+                        setSelectedTagIndex(-1);
+                      }}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter" && tagFilter.trim() && filteredTags.length === 0) {
-                          handleAddTag();
+                        const maxIndex = filteredTags.length > 0 ? filteredTags.length - 1 : 0;
+                        
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setSelectedTagIndex((prev) => Math.min(prev + 1, maxIndex));
+                        } else if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setSelectedTagIndex((prev) => Math.max(prev - 1, -1));
+                        } else if (e.key === "Enter") {
+                          e.preventDefault();
+                          if (filteredTags.length > 0 && selectedTagIndex >= 0) {
+                            // Select existing tag
+                            handleToggleTag(filteredTags[selectedTagIndex].id);
+                            setIsAddingTag(false);
+                            setTagFilter("");
+                            setSelectedTagIndex(-1);
+                          } else if (tagFilter.trim() && filteredTags.length === 0) {
+                            // Add new tag
+                            handleAddTag();
+                            setSelectedTagIndex(-1);
+                          }
                         }
                       }}
                       placeholder="Search or add tag..."
@@ -671,15 +774,19 @@ export function NoteEditor({
                     />
                     <div className="space-y-1 max-h-40 overflow-y-auto">
                       {filteredTags.length > 0 ? (
-                        filteredTags.map((tag) => (
+                        filteredTags.map((tag, index) => (
                           <button
                             key={tag.id}
                             onClick={() => {
                               handleToggleTag(tag.id);
                               setIsAddingTag(false);
                               setTagFilter("");
+                              setSelectedTagIndex(-1);
                             }}
-                            className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors"
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
+                              selectedTagIndex === index && "bg-accent"
+                            )}
                           >
                             {tag.name}
                           </button>
@@ -687,7 +794,10 @@ export function NoteEditor({
                       ) : tagFilter.trim() ? (
                         <button
                           onClick={handleAddTag}
-                          className="w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium"
+                          className={cn(
+                            "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
+                            selectedTagIndex === 0 && "bg-accent"
+                          )}
                         >
                           <Plus className="h-3.5 w-3.5 inline mr-2" />
                           Add Tag "{tagFilter}"

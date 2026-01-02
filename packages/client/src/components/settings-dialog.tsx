@@ -1,5 +1,3 @@
-"use client";
-
 import {
   Accordion,
   AccordionContent,
@@ -19,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { Category } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useCategoriesStore } from "@/lib/store";
 import { FolderTree, Settings, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -26,7 +25,8 @@ interface SettingsDialogProps {
   isOpen: boolean;
   onClose: () => void;
   categories: Category[];
-  onUpdateCategories: (categories: Category[]) => void;
+  onUpdateCategories?: (categories: Category[]) => void; // Deprecated, kept for compatibility
+  onCategoryCreated?: (categoryId: string) => void; // Callback when new category is created
   preSelectTab?: "ai" | "categories";
   preFillCategoryName?: string;
 }
@@ -35,36 +35,76 @@ export function SettingsDialog({
   isOpen,
   onClose,
   categories,
-  onUpdateCategories,
+  onCategoryCreated,
   preSelectTab,
   preFillCategoryName,
 }: SettingsDialogProps) {
+  const createCategory = useCategoriesStore((state) => state.createCategory);
+  const updateCategory = useCategoriesStore((state) => state.updateCategory);
+  const deleteCategory = useCategoriesStore((state) => state.deleteCategory);
+  const getCategoryByName = useCategoriesStore((state) => state.getCategoryByName);
+
   const [apiEndpoint, setApiEndpoint] = useState("https://api.openai.com/v1");
   const [apiKey, setApiKey] = useState("");
   const [editingCategories, setEditingCategories] = useState(categories);
   const [activeTab, setActiveTab] = useState<"ai" | "categories">("ai");
+  const [newCategoryIds, setNewCategoryIds] = useState<Set<string>>(new Set()); // Track new categories
 
   useEffect(() => {
     if (isOpen) {
       setEditingCategories(categories);
+      setNewCategoryIds(new Set());
       if (preSelectTab) {
         setActiveTab(preSelectTab);
       }
       if (preFillCategoryName && preSelectTab === "categories") {
-        // Add new category with pre-filled name
+        // Add new category with pre-filled name at the top
+        const tempId = `temp-${Date.now()}`;
         const newCategory: Category = {
-          id: Date.now().toString(),
+          id: tempId,
           name: preFillCategoryName,
           color: "blue",
           aiPrompt: "",
         };
-        setEditingCategories((prev) => [...prev, newCategory]);
+        setEditingCategories((prev) => [newCategory, ...prev]);
+        setNewCategoryIds(new Set([tempId]));
+        
+        // Focus the input after a short delay
+        setTimeout(() => {
+          const input = document.getElementById(`category-name-${tempId}`) as HTMLInputElement;
+          input?.focus();
+          input?.select(); // Also select the text so user can start typing immediately
+        }, 100);
       }
     }
   }, [isOpen, categories, preSelectTab, preFillCategoryName]);
 
-  const handleSaveCategories = () => {
-    onUpdateCategories(editingCategories);
+  const handleSaveCategories = async () => {
+    let createdCategoryId: string | null = null;
+
+    // Process categories: create new ones, update existing ones
+    for (const category of editingCategories) {
+      if (newCategoryIds.has(category.id)) {
+        // This is a new category - create it
+        const newId = await createCategory(category.name, category.aiPrompt);
+        if (preFillCategoryName && category.name === preFillCategoryName) {
+          createdCategoryId = newId;
+        }
+      } else {
+        // This is an existing category - update it
+        await updateCategory(category.id, {
+          name: category.name,
+          color: category.color,
+          aiPrompt: category.aiPrompt,
+        });
+      }
+    }
+
+    // Notify parent if a new category was created (for auto-adding to note)
+    if (createdCategoryId && onCategoryCreated) {
+      onCategoryCreated(createdCategoryId);
+    }
+
     onClose();
   };
 
@@ -74,12 +114,46 @@ export function SettingsDialog({
     );
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
     setEditingCategories((prev) => prev.filter((cat) => cat.id !== id));
+    setNewCategoryIds((prev) => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+    // Only delete from store if it's not a new category
+    if (!newCategoryIds.has(id)) {
+      await deleteCategory(id);
+    }
+  };
+
+  const handleAddNewCategory = () => {
+    const tempId = `temp-${Date.now()}`;
+    const newCategory: Category = {
+      id: tempId,
+      name: "",
+      color: "blue",
+      aiPrompt: "",
+    };
+    setEditingCategories((prev) => [newCategory, ...prev]); // Add to top
+    setNewCategoryIds((prev) => new Set(prev).add(tempId));
+    
+    // Focus the input after a short delay to allow DOM to update
+    setTimeout(() => {
+      const input = document.getElementById(`category-name-${tempId}`) as HTMLInputElement;
+      input?.focus();
+    }, 50);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open) {
+        // Reset editing state when closing without saving
+        setEditingCategories(categories);
+        setNewCategoryIds(new Set());
+      }
+      onClose();
+    }}>
       <DialogContent className="max-w-3xl lg:max-w-5xl max-h-[85vh] p-0 overflow-hidden">
         <DialogHeader className="px-6 pt-6 pb-4 border-b">
           <DialogTitle>Settings</DialogTitle>
@@ -151,12 +225,21 @@ export function SettingsDialog({
             )}
 
             {activeTab === "categories" && (
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Configure categories and their AI enrichment prompts
-                </p>
+              <div className="flex flex-col h-full">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm text-muted-foreground">
+                    Configure categories and their AI enrichment prompts
+                  </p>
+                  <Button
+                    onClick={handleAddNewCategory}
+                    size="sm"
+                    variant="outline"
+                  >
+                    Add Category
+                  </Button>
+                </div>
 
-                <div className="space-y-4">
+                <div className="flex-1 overflow-y-auto space-y-4 pr-2">
                   {editingCategories.map((category) => (
                     <div
                       key={category.id}
@@ -164,6 +247,7 @@ export function SettingsDialog({
                     >
                       <div className="flex items-center justify-between">
                         <Input
+                          id={`category-name-${category.id}`}
                           value={category.name}
                           onChange={(e) =>
                             handleUpdateCategory(category.id, "name", e.target.value)
@@ -198,9 +282,11 @@ export function SettingsDialog({
                   ))}
                 </div>
 
-                <Button onClick={handleSaveCategories} className="w-full">
-                  Save Categories
-                </Button>
+                <div className="mt-4 pt-4 border-t border-border">
+                  <Button onClick={handleSaveCategories} className="w-full">
+                    Save Categories
+                  </Button>
+                </div>
               </div>
             )}
           </div>

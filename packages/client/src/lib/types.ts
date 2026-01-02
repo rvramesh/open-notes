@@ -37,16 +37,22 @@ export interface Note {
   };
 }
 
+export type ColorName = 
+  | "rose" | "pink" | "fuchsia" | "purple" | "violet"
+  | "indigo" | "blue" | "sky" | "cyan" | "teal"
+  | "emerald" | "green" | "lime" | "yellow" | "amber"
+  | "orange" | "red" | "warmGray" | "coolGray" | "slate";
+
 export interface Tag {
   id: string;
   name: string;
-  color: "rose" | "blue" | "purple" | "green" | "amber";
+  color: ColorName;
 }
 
 export interface Category {
   id: string;
   name: string;
-  color: "rose" | "blue" | "purple" | "green" | "amber";
+  color: ColorName;
   aiPrompt: string;
 }
 
