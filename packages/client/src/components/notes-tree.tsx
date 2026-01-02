@@ -70,7 +70,7 @@ export function NotesTree({
 
   const renderCategoryView = () => {
     return categories.map((category) => {
-      const categoryNotes = notes.filter((note) => note.categoryIds.includes(category.id));
+      const categoryNotes = notes.filter((note) => note.categories.includes(category.id));
       const isExpanded = expandedCategories.has(category.id);
 
       return (
@@ -369,7 +369,24 @@ function SearchResultCard({
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const excerpt = note.content.slice(0, 100).trim() + (note.content.length > 100 ? "..." : "");
+  // Extract excerpt from content blocks
+  let excerpt = "";
+  if (note.contentBlocks && note.contentBlocks.length > 0) {
+    const textBlocks = note.contentBlocks
+      .map((block) => {
+        if (typeof block.content === 'string') {
+          return block.content;
+        }
+        if (block.content && typeof block.content === 'object' && 'text' in block.content) {
+          return (block.content as any).text;
+        }
+        return '';
+      })
+      .filter(text => text.trim());
+    
+    const fullText = textBlocks.join(' ');
+    excerpt = fullText.slice(0, 100).trim() + (fullText.length > 100 ? "..." : "");
+  }
 
   return (
     <button

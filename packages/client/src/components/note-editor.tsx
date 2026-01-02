@@ -39,9 +39,10 @@ import { PlateEditor } from "./plate-editor";
 
 interface NoteEditorProps {
   note: Note | null;
+  noteId: string | null;
   tags: Tag[];
   categories: Category[];
-  onUpdateNote: (note: Note) => void;
+  onUpdateNote: (noteId: string, updates: Partial<Note>) => Promise<void>;
   onAddTag: (tag: Tag) => void;
   onAddCategory: (category: Category) => void;
   onRemoveTag: (tagId: string) => void;
@@ -63,6 +64,7 @@ const tagColorClasses = {
 
 export function NoteEditor({
   note,
+  noteId,
   tags,
   categories,
   onUpdateNote,
@@ -76,7 +78,6 @@ export function NoteEditor({
   onDeleteNote,
 }: NoteEditorProps) {
   const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isSaved, setIsSaved] = useState(true);
   const [isTyping, setIsTyping] = useState(false);
@@ -91,97 +92,214 @@ export function NoteEditor({
 
   const [hasChanges, setHasChanges] = useState(false);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingContentRef = useRef<string | null>(null);
+  const saveInProgressRef = useRef<boolean>(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
+
+  // Serialize contentBlocks to JSON string for the editor
+  const contentString = useMemo(() => {
+    if (!note || !note.contentBlocks || note.contentBlocks.length === 0) {
+      return "";
+    }
+    return JSON.stringify(note.contentBlocks);
+  }, [note?.id, note?.contentBlocks]);
 
   useEffect(() => {
     if (note) {
       setTitle(note.title);
-      setContent(note.content);
+      pendingContentRef.current = null; // Clear pending changes when switching notes
       setHasChanges(false);
       setIsSaved(true);
       setIsTyping(false);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      
+      // Focus title input when a new note is loaded
+      setTimeout(() => titleInputRef.current?.focus(), 0);
+    } else {
+      setTitle("");
+      pendingContentRef.current = null;
+      setHasChanges(false);
+      setIsSaved(true);
+      setIsTyping(false);
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
     }
-  }, [note]);
+  }, [note?.id]);
 
   useEffect(() => {
-    if (!note) return;
+    if (!noteId) return;
     if (!hasChanges) return;
+    if (saveInProgressRef.current) return;
 
+    // Clear any existing timeouts
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
 
+    // Show typing indicator immediately
     setIsTyping(true);
     setIsSaving(false);
     setIsSaved(false);
 
-    saveTimeoutRef.current = setTimeout(() => {
+    // Clear typing indicator after 10 seconds of no changes
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+    }, 10000);
+
+    // Save after 10 seconds of no changes
+    saveTimeoutRef.current = setTimeout(async () => {
       setIsTyping(false);
       setIsSaving(true);
+      saveInProgressRef.current = true;
 
-      onUpdateNote({
-        ...note,
-        title,
-        content,
-        updatedAt: new Date(),
-      });
+      try {
+        // Parse content string back to blocks
+        let contentBlocks = [];
+        try {
+          const contentToSave = pendingContentRef.current || contentString;
+          if (contentToSave) {
+            contentBlocks = JSON.parse(contentToSave);
+          }
+        } catch (e) {
+          console.error("Failed to parse content blocks:", e);
+        }
 
-      setIsSaving(false);
-      setIsSaved(true);
-      setHasChanges(false);
+        await onUpdateNote(noteId, {
+          title,
+          contentBlocks,
+        });
 
-      setTimeout(() => setIsSaved(false), 2000);
-    }, 1000);
+        setIsSaving(false);
+        setIsSaved(true);
+        setHasChanges(false);
+        pendingContentRef.current = null; // Clear pending content after save
+      } catch (error) {
+        console.error("Failed to save note:", error);
+        setIsSaving(false);
+        setIsSaved(false);
+      } finally {
+        saveInProgressRef.current = false;
+      }
+    }, 10000);
 
     return () => {
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
     };
-  }, [title, content, note, onUpdateNote, hasChanges]);
+  }, [title, noteId, onUpdateNote, hasChanges]);
 
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
     setHasChanges(true);
   };
 
+  const handleTitleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      // Save immediately
+      await handleSaveNow();
+      // Focus the editor
+      const editableElement = editorContainerRef.current?.querySelector('[contenteditable="true"]') as HTMLElement;
+      editableElement?.focus();
+    }
+  };
+
   const handleContentChange = (newContent: string) => {
-    setContent(newContent);
-    setHasChanges(true);
+    // Only mark as changed if content actually differs
+    const currentContent = contentString || "";
+    if (newContent !== currentContent) {
+      pendingContentRef.current = newContent;
+      setHasChanges(true);
+    }
+  };
+
+  const handleSaveNow = async () => {
+    if (!noteId || !hasChanges || saveInProgressRef.current) return;
+
+    // Clear timeouts
+    if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+
+    setIsTyping(false);
+    setIsSaving(true);
+    saveInProgressRef.current = true;
+
+    try {
+      let contentBlocks = [];
+      try {
+        const contentToSave = pendingContentRef.current || contentString;
+        if (contentToSave) {
+          contentBlocks = JSON.parse(contentToSave);
+        }
+      } catch (e) {
+        console.error("Failed to parse content blocks:", e);
+      }
+
+      await onUpdateNote(noteId, {
+        title,
+        contentBlocks,
+      });
+
+      setIsSaving(false);
+      setIsSaved(true);
+      setHasChanges(false);
+      pendingContentRef.current = null;
+    } catch (error) {
+      console.error("Failed to save note:", error);
+      setIsSaving(false);
+      setIsSaved(false);
+    } finally {
+      saveInProgressRef.current = false;
+    }
   };
 
   const handleToggleTag = (tagId: string) => {
-    if (!note) return;
-    const newTagIds = note.tagIds.includes(tagId)
-      ? note.tagIds.filter((id) => id !== tagId)
-      : [...note.tagIds, tagId];
-    onUpdateNote({ ...note, tagIds: newTagIds, updatedAt: new Date() });
+    if (!noteId || !note) return;
+    const newUserTags = note.tags.user.includes(tagId)
+      ? note.tags.user.filter((id) => id !== tagId)
+      : [...note.tags.user, tagId];
+    onUpdateNote(noteId, {
+      tags: {
+        ...note.tags,
+        user: newUserTags,
+      },
+    });
   };
 
   const handleToggleCategory = (categoryId: string) => {
-    if (!note) return;
-    const newCategoryIds = note.categoryIds.includes(categoryId)
-      ? note.categoryIds.filter((id) => id !== categoryId)
-      : [...note.categoryIds, categoryId];
-    onUpdateNote({ ...note, categoryIds: newCategoryIds, updatedAt: new Date() });
+    if (!noteId || !note) return;
+    const newCategories = note.categories.includes(categoryId)
+      ? note.categories.filter((id) => id !== categoryId)
+      : [...note.categories, categoryId];
+    onUpdateNote(noteId, { categories: newCategories });
   };
 
   const handleRemoveTag = (tagId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!note) return;
-    onUpdateNote({
-      ...note,
-      tagIds: note.tagIds.filter((id) => id !== tagId),
-      updatedAt: new Date(),
+    if (!noteId || !note) return;
+    onUpdateNote(noteId, {
+      tags: {
+        ...note.tags,
+        user: note.tags.user.filter((id) => id !== tagId),
+      },
     });
   };
 
   const handleRemoveCategory = (categoryId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!note) return;
-    onUpdateNote({
-      ...note,
-      categoryIds: note.categoryIds.filter((id) => id !== categoryId),
-      updatedAt: new Date(),
+    if (!noteId || !note) return;
+    onUpdateNote(noteId, {
+      categories: note.categories.filter((id) => id !== categoryId),
     });
   };
 
@@ -193,8 +311,13 @@ export function NoteEditor({
         color: "blue",
       };
       onAddTag(newTag);
-      if (note) {
-        onUpdateNote({ ...note, tagIds: [...note.tagIds, newTag.id], updatedAt: new Date() });
+      if (noteId && note) {
+        onUpdateNote(noteId, {
+          tags: {
+            ...note.tags,
+            user: [...note.tags.user, newTag.id],
+          },
+        });
       }
       setTagFilter("");
       setIsAddingTag(false);
@@ -210,22 +333,22 @@ export function NoteEditor({
   };
 
   const filteredTags = useMemo(() => {
-    if (!tagFilter.trim()) return tags.filter((tag) => !note?.tagIds.includes(tag.id));
+    if (!tagFilter.trim()) return tags.filter((tag) => !note?.tags.user.includes(tag.id));
     return tags.filter(
       (tag) =>
-        !note?.tagIds.includes(tag.id) && tag.name.toLowerCase().includes(tagFilter.toLowerCase())
+        !note?.tags.user.includes(tag.id) && tag.name.toLowerCase().includes(tagFilter.toLowerCase())
     );
-  }, [tags, tagFilter, note?.tagIds]);
+  }, [tags, tagFilter, note?.tags]);
 
   const filteredCategories = useMemo(() => {
     if (!categoryFilter.trim())
-      return categories.filter((cat) => !note?.categoryIds.includes(cat.id));
+      return categories.filter((cat) => !note?.categories.includes(cat.id));
     return categories.filter(
       (cat) =>
-        !note?.categoryIds.includes(cat.id) &&
+        !note?.categories.includes(cat.id) &&
         cat.name.toLowerCase().includes(categoryFilter.toLowerCase())
     );
-  }, [categories, categoryFilter, note?.categoryIds]);
+  }, [categories, categoryFilter, note?.categories]);
 
   const handleCategoryClick = (categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
@@ -242,8 +365,18 @@ export function NoteEditor({
   const handleExportPDF = () => {
     if (!note) return;
 
+    // Extract text content from blocks
+    const blockTexts = note.contentBlocks.map((block) => {
+      if (typeof block.content === 'string') {
+        return block.content;
+      }
+      return JSON.stringify(block.content);
+    });
+
     // Create a formatted text version of the note
-    const noteContent = `${note.title}\n\nCreated: ${note.createdAt.toLocaleDateString()}\nUpdated: ${note.updatedAt.toLocaleDateString()}\n\n${note.content}`;
+    const createdDate = new Date(note.createdAt).toLocaleDateString();
+    const updatedDate = new Date(note.updatedAt).toLocaleDateString();
+    const noteContent = `${note.title}\n\nCreated: ${createdDate}\nUpdated: ${updatedDate}\n\n${blockTexts.join('\n\n')}`;
 
     // Create a blob and download
     const blob = new Blob([noteContent], { type: "text/plain" });
@@ -274,17 +407,19 @@ export function NoteEditor({
     );
   }
 
-  const noteTags = tags.filter((tag) => note.tagIds.includes(tag.id));
-  const noteCategories = categories.filter((cat) => note.categoryIds.includes(cat.id));
+  const noteTags = tags.filter((tag) => note.tags.user.includes(tag.id));
+  const noteCategories = categories.filter((cat) => note.categories.includes(cat.id));
 
   return (
     <div className="flex-1 flex flex-col px-0 md:px-4 pb-3 min-h-0 notes-section">
       <div className="flex-1 bg-background md:rounded-xl md:border md:border-border md:shadow-sm flex flex-col overflow-hidden min-h-0">
         <div className="p-3 border-b border-border">
           <input
+            ref={titleInputRef}
             type="text"
             value={title === "Untitled Note" ? "" : title}
             onChange={handleTitleChange}
+            onKeyDown={handleTitleKeyDown}
             placeholder="Untitled Note"
             className="w-full text-2xl font-bold bg-transparent border-none outline-none placeholder:text-muted-foreground"
           />
@@ -394,7 +529,7 @@ export function NoteEditor({
               </div>
             </div>
           ) : (
-            <PlateEditor content={content} onChange={handleContentChange} />
+            <PlateEditor ref={editorContainerRef} content={contentString} onChange={handleContentChange} noteId={noteId} onBlur={handleSaveNow} />
           )}
         </div>
 

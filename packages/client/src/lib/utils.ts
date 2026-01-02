@@ -5,9 +5,9 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatRelativeTime(date: Date | string): string {
+export function formatRelativeTime(date: Date | string | number): string {
   const now = new Date();
-  const then = typeof date === "string" ? new Date(date) : date;
+  const then = typeof date === "string" ? new Date(date) : typeof date === "number" ? new Date(date) : date;
   const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
 
   if (diffInSeconds < 60) {

@@ -4,8 +4,9 @@ import { CommandPalette } from "@/components/command-palette";
 import { NoteEditor } from "@/components/note-editor";
 import { NotesTree } from "@/components/notes-tree";
 import { SettingsDialog } from "@/components/settings-dialog";
-import type { Category, Note, Tag } from "@/lib/types";
-import { useState } from "react";
+import type { Category, Tag, Note } from "@/lib/types";
+import { useNotesStore } from "@/lib/store";
+import { useState, useEffect } from "react";
 
 // Mock data
 const mockCategories: Category[] = [
@@ -32,31 +33,23 @@ const mockTags: Tag[] = [
   { id: "4", name: "Technical", color: "green" },
 ];
 
-const mockNotes: Note[] = [
-  {
-    id: "1",
-    title: "Meeting Notes - Q1 Planning",
-    content:
-      "Discussed quarterly goals and team objectives. Need to follow up on budget allocation.",
-    categoryIds: ["2"],
-    tagIds: ["1", "2"],
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-15"),
-  },
-  {
-    id: "2",
-    title: "Book Ideas",
-    content: "Collection of interesting book concepts and plot ideas for future writing projects.",
-    categoryIds: ["1"],
-    tagIds: ["3"],
-    createdAt: new Date("2024-01-14"),
-    updatedAt: new Date("2024-01-16"),
-  },
-];
-
 export function NotesWorkspace() {
-  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(mockNotes[0]?.id || null);
-  const [notes, setNotes] = useState<Note[]>(mockNotes);
+  // Store state - use stable selectors
+  const notesMap = useNotesStore((state) => state.notes);
+  const orderedNoteIds = useNotesStore((state) => state.orderedNoteIds);
+  const createNote = useNotesStore((state) => state.createNote);
+  const updateNote = useNotesStore((state) => state.updateNote);
+  const deleteNote = useNotesStore((state) => state.deleteNote);
+  const refreshFromAdapter = useNotesStore((state) => state.refreshFromAdapter);
+  const getNote = useNotesStore((state) => state.getNote);
+  const getNotesByCategory = useNotesStore((state) => state.getNotesByCategory);
+  const getNotesByTag = useNotesStore((state) => state.getNotesByTag);
+  
+  // Derive notes array from the map (stable reference via orderedNoteIds)
+  const notes = orderedNoteIds.map(id => notesMap[id]).filter((note): note is Note => note !== undefined);
+
+  // Local UI state
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [tags, setTags] = useState<Tag[]>(mockTags);
   const [categories, setCategories] = useState<Category[]>(mockCategories);
   const [isLeftBarCollapsed, setIsLeftBarCollapsed] = useState(false);
@@ -68,63 +61,74 @@ export function NotesWorkspace() {
     undefined
   );
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<Note[]>([]);
+  const [searchResults, setSearchResults] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  const selectedNote = notes.find((note) => note.id === selectedNoteId) || null;
+  // Load notes on mount
+  useEffect(() => {
+    refreshFromAdapter().then(() => {
+      // Select first note if available
+      if (orderedNoteIds.length > 0 && !selectedNoteId) {
+        setSelectedNoteId(orderedNoteIds[0]);
+      }
+    });
+  }, []);
 
-  const handleUpdateNote = (updatedNote: Note) => {
-    setNotes((prev) => prev.map((note) => (note.id === updatedNote.id ? updatedNote : note)));
+  const selectedNote = selectedNoteId ? getNote(selectedNoteId) ?? null : null;
+
+  const handleUpdateNote = async (noteId: string, updates: Partial<typeof selectedNote>) => {
+    await updateNote(noteId, (note) => ({
+      ...note,
+      ...updates,
+    }));
   };
 
-  const handleCreateNote = () => {
-    // Save current note first
-    if (selectedNote) {
-      handleUpdateNote(selectedNote);
-    }
-
-    // Create new note
-    const newNote: Note = {
-      id: Date.now().toString(),
+  const handleCreateNote = async () => {
+    // Create new note with empty content blocks
+    const noteId = await createNote({
       title: "Untitled Note",
-      content: "",
-      categoryIds: [],
-      tagIds: [],
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    setNotes((prev) => [newNote, ...prev]);
-    setSelectedNoteId(newNote.id);
+      contentBlocks: [],
+      categories: [],
+      tags: { user: [], system: [] },
+    });
+    setSelectedNoteId(noteId);
   };
 
   const handleRemoveTag = (tagId: string) => {
     setTags((prev) => prev.filter((tag) => tag.id !== tagId));
     // Remove tag from all notes
-    setNotes((prev) =>
-      prev.map((note) => ({
-        ...note,
-        tagIds: note.tagIds.filter((id) => id !== tagId),
-      }))
-    );
+    notes.forEach((note) => {
+      if (note.tags.user.includes(tagId)) {
+        updateNote(note.id, (n) => ({
+          ...n,
+          tags: {
+            ...n.tags,
+            user: n.tags.user.filter((id) => id !== tagId),
+          },
+        }));
+      }
+    });
   };
 
   const handleRemoveCategory = (categoryId: string) => {
     setCategories((prev) => prev.filter((cat) => cat.id !== categoryId));
     // Remove category from all notes
-    setNotes((prev) =>
-      prev.map((note) => ({
-        ...note,
-        categoryIds: note.categoryIds.filter((id) => id !== categoryId),
-      }))
-    );
+    notes.forEach((note) => {
+      if (note.categories.includes(categoryId)) {
+        updateNote(note.id, (n) => ({
+          ...n,
+          categories: n.categories.filter((id) => id !== categoryId),
+        }));
+      }
+    });
   };
 
-  const handleDeleteNote = (noteId: string) => {
-    setNotes((prev) => prev.filter((note) => note.id !== noteId));
+  const handleDeleteNote = async (noteId: string) => {
+    await deleteNote(noteId);
     // Select another note if the deleted one was selected
     if (selectedNoteId === noteId) {
-      const remainingNotes = notes.filter((note) => note.id !== noteId);
-      setSelectedNoteId(remainingNotes[0]?.id || null);
+      const remainingIds = orderedNoteIds.filter((id) => id !== noteId);
+      setSelectedNoteId(remainingIds[0] || null);
     }
   };
 
@@ -143,11 +147,19 @@ export function NotesWorkspace() {
   const handleSearch = (query: string) => {
     setSearchQuery(query);
     if (query.trim()) {
-      const results = notes.filter(
-        (note) =>
-          note.title.toLowerCase().includes(query.toLowerCase()) ||
-          note.content.toLowerCase().includes(query.toLowerCase())
-      );
+      // Search in note titles and content blocks
+      const results = notes
+        .filter((note) => {
+          const titleMatch = note.title.toLowerCase().includes(query.toLowerCase());
+          const contentMatch = note.contentBlocks.some((block) => {
+            if (block.type === 'p' || block.type === 'h1' || block.type === 'h2') {
+              return JSON.stringify(block.content).toLowerCase().includes(query.toLowerCase());
+            }
+            return false;
+          });
+          return titleMatch || contentMatch;
+        })
+        .map((note) => note.id);
       setSearchResults(results);
       setIsSearchActive(true);
     } else {
@@ -159,7 +171,7 @@ export function NotesWorkspace() {
   const handleSearchByCategory = (categoryId: string) => {
     const category = categories.find((cat) => cat.id === categoryId);
     if (category) {
-      const results = notes.filter((note) => note.categoryIds.includes(categoryId));
+      const results = getNotesByCategory(categoryId).map((note) => note.id);
       setSearchQuery(`Category: ${category.name}`);
       setSearchResults(results);
       setIsSearchActive(true);
@@ -169,7 +181,7 @@ export function NotesWorkspace() {
   const handleSearchByTag = (tagId: string) => {
     const tag = tags.find((t) => t.id === tagId);
     if (tag) {
-      const results = notes.filter((note) => note.tagIds.includes(tagId));
+      const results = getNotesByTag(tagId).map((note) => note.id);
       setSearchQuery(`Tag: ${tag.name}`);
       setSearchResults(results);
       setIsSearchActive(true);
@@ -181,6 +193,9 @@ export function NotesWorkspace() {
     setSearchResults([]);
     setIsSearchActive(false);
   };
+
+  // Convert search results from IDs to notes for components
+  const searchResultNotes = searchResults.map((id) => getNote(id)).filter((note): note is NonNullable<typeof note> => note !== undefined);
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
@@ -194,7 +209,7 @@ export function NotesWorkspace() {
           onOpenSettings={() => setIsSettingsOpen(true)}
           isSearchActive={isSearchActive}
           searchQuery={searchQuery}
-          searchResults={searchResults}
+          searchResults={searchResultNotes}
           onClearSearch={handleClearSearch}
         />
       )}
@@ -212,6 +227,7 @@ export function NotesWorkspace() {
 
         <NoteEditor
           note={selectedNote}
+          noteId={selectedNoteId}
           tags={tags}
           categories={categories}
           onUpdateNote={handleUpdateNote}
