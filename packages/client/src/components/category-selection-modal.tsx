@@ -103,7 +103,7 @@ export function CategorySelectionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="space-y-4 flex flex-col h-96">
           <Input
             placeholder="Search categories..."
             value={searchQuery}
@@ -113,7 +113,7 @@ export function CategorySelectionModal({
             className="w-full"
           />
 
-          <div className="space-y-2 max-h-96 overflow-y-auto">
+          <div className="space-y-2 flex-1 overflow-y-auto min-h-0">
             {filteredOptions.map((option, index) => {
               const isSelected = index === selectedIndex;
               

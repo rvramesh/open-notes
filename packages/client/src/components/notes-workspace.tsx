@@ -79,7 +79,35 @@ export function NotesWorkspace() {
   };
 
   const handleCreateNote = async () => {
-    // Show category selection modal
+    // Filter manual categories (noEnrichment = true)
+    const manualCategories = categories.filter((cat) => cat.noEnrichment === true);
+    const hasAICategories = categories.some((cat) => !cat.noEnrichment);
+
+    // If no manual categories, auto-classify using AI
+    if (manualCategories.length === 0) {
+      const noteId = await createNote({
+        title: "Untitled Note",
+        contentBlocks: [],
+        category: undefined, // AI Auto Classify
+        tags: { user: [], system: [] },
+      });
+      setSelectedNoteId(noteId);
+      return;
+    }
+
+    // If only one manual category and no AI categories, create note with that category
+    if (manualCategories.length === 1 && !hasAICategories) {
+      const noteId = await createNote({
+        title: "Untitled Note",
+        contentBlocks: [],
+        category: manualCategories[0].id,
+        tags: { user: [], system: [] },
+      });
+      setSelectedNoteId(noteId);
+      return;
+    }
+
+    // Multiple categories or multiple options available, show selection modal
     setShowCategorySelection(true);
   };
 
