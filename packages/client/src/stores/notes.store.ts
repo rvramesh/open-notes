@@ -84,7 +84,7 @@ export const createNotesStore = (adapter: NotesPersistenceAdapter) => {
         updatedAt: now,
         contentBlocks: initialData?.contentBlocks || [],
         enrichmentBlocks: [],
-        categories: initialData?.categories || [],
+        category: initialData?.category,
         tags: initialData?.tags || { user: [], system: [] },
         embeddings: initialData?.embeddings,
         ...initialData,
@@ -328,7 +328,7 @@ export const createNotesStore = (adapter: NotesPersistenceAdapter) => {
     // Query: Get notes by category
     getNotesByCategory: (categoryId: string): Note[] => {
       return Object.values(get().notes).filter((note) =>
-        note.categories.includes(categoryId)
+        note.category === categoryId
       );
     },
 

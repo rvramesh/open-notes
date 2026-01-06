@@ -4,6 +4,9 @@ export type BlockId = string;
 export type Timestamp = number; // Milliseconds since Unix epoch (UTC), from Date.now()
 export type Embedding = number[];
 
+// Re-export Category from settings-types for convenience
+export type { Category } from './settings-types';
+
 // Block Model
 export interface Block {
   id: BlockId;
@@ -30,7 +33,7 @@ export interface Note {
   embeddings?: Embedding[];
 
   // Classification
-  categories: string[]; // References to Category IDs in settings
+  category?: string; // Reference to Category ID in settings (single category)
   tags: {
     user: string[]; // User-applied tags
     system: string[]; // AI-generated tags
@@ -49,13 +52,7 @@ export interface Tag {
   color: ColorName;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-  color: ColorName;
-  enrichmentPrompt: string;
-  noEnrichment: boolean; // If true, notes in this category won't be shared with AI for enrichment
-}
+// Category is defined in settings-types.ts - import from there
 
 // Model Configuration for AI
 export interface ModelConfiguration {

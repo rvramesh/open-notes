@@ -2,12 +2,12 @@
 
 This document lists all third-party dependencies and their licenses.
 
-**Generated on:** 2026-01-01
+**Generated on:** 2026-01-06
 
 ## Summary
 
-- **Total Packages:** 139
-- **Approved Licenses:** 139
+- **Total Packages:** 142
+- **Approved Licenses:** 142
 - **Flagged Licenses:** 0
 
 ---
@@ -15,6 +15,7 @@ This document lists all third-party dependencies and their licenses.
 ## License Breakdown
 
 ### MIT-Compatible Licenses ✅
+
 
 #### Apache-2.0 (4)
 
@@ -31,19 +32,13 @@ This document lists all third-party dependencies and their licenses.
   Repository: https://github.com/microsoft/TypeScript.git
   Homepage: https://www.typescriptlang.org/
 
-#### BSD-2-Clause (1)
-
-- **@typescript-eslint/parser** (v7.18.0)
-  Repository: https://github.com/typescript-eslint/typescript-eslint.git
-  Homepage: https://typescript-eslint.io/packages/parser
-
 #### ISC (1)
 
 - **lucide-react** (v0.454.0)
   Repository: https://github.com/lucide-icons/lucide.git
   Homepage: https://lucide.dev
 
-#### MIT (133)
+#### MIT (137)
 
 - **@ariakit/react** (v0.4.20)
   Repository: https://github.com/ariakit/ariakit.git
@@ -51,6 +46,9 @@ This document lists all third-party dependencies and their licenses.
 - **@emoji-mart/data** (v1.2.1)
   Repository: https://github.com/missive/emoji-mart
   Homepage: https://missiveapp.com/open/emoji-mart
+- **@eslint/js** (v8.57.1)
+  Repository: https://github.com/eslint/eslint.git
+  Homepage: https://eslint.org
 - **@faker-js/faker** (v10.1.0)
   Repository: git+https://github.com/faker-js/faker.git
   Homepage: https://fakerjs.dev
@@ -249,9 +247,6 @@ This document lists all third-party dependencies and their licenses.
 - **@types/react** (v19.2.7)
   Repository: https://github.com/DefinitelyTyped/DefinitelyTyped.git
   Homepage: https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/react
-- **@typescript-eslint/eslint-plugin** (v7.18.0)
-  Repository: https://github.com/typescript-eslint/typescript-eslint.git
-  Homepage: https://typescript-eslint.io/packages/eslint-plugin
 - **@udecode/cn** (v52.0.11)
   Repository: https://github.com/udecode/plate.git
 - **@udecode/plate-basic-marks** (v48.0.0)
@@ -308,14 +303,16 @@ This document lists all third-party dependencies and their licenses.
 - **eslint** (v8.57.1)
   Repository: eslint/eslint
   Homepage: https://eslint.org
-- **eslint-plugin-react-hooks** (v4.6.2)
+- **eslint-plugin-react-hooks** (v5.2.0)
   Repository: https://github.com/facebook/react.git
-  Homepage: https://reactjs.org/
+  Homepage: https://react.dev/
 - **eslint-plugin-react-refresh** (v0.4.26)
   Repository: github:ArnaudBarre/eslint-plugin-react-refresh
 - **fastify** (v5.6.2)
   Repository: git+https://github.com/fastify/fastify.git
   Homepage: https://fastify.dev/
+- **globals** (v13.24.0)
+  Repository: sindresorhus/globals
 - **html2canvas-pro** (v1.6.3)
   Repository: https://github.com/yorickshan/html2canvas-pro
   Homepage: https://yorickshan.github.io/html2canvas-pro/
@@ -401,6 +398,12 @@ This document lists all third-party dependencies and their licenses.
 - **tw-animate-css** (v1.3.3)
   Repository: Wombosvideo/tw-animate-css
   Homepage: https://github.com/Wombosvideo/tw-animate-css#readme
+- **typescript-eslint** (v8.51.0)
+  Repository: https://github.com/typescript-eslint/typescript-eslint.git
+  Homepage: https://typescript-eslint.io/packages/typescript-eslint
+- **ulid** (v3.0.2)
+  Repository: git+https://github.com/ulid/javascript.git
+  Homepage: https://github.com/ulid/javascript#readme
 - **uploadthing** (v7.7.4)
   Repository: github:pingdotgg/uploadthing
 - **use-file-picker** (v2.1.2)
@@ -419,6 +422,9 @@ This document lists all third-party dependencies and their licenses.
 - **zod** (v3.25.76)
   Repository: git+https://github.com/colinhacks/zod.git
   Homepage: https://zod.dev
+- **zustand** (v5.0.9)
+  Repository: git+https://github.com/pmndrs/zustand.git
+  Homepage: https://github.com/pmndrs/zustand
 
 ---
 

@@ -2,7 +2,7 @@
  * Settings-related type definitions
  */
 
-import type { Timestamp } from './types';
+import type { Timestamp, ColorName } from './types';
 
 /**
  * Theme preference
@@ -35,8 +35,9 @@ export interface ModelConfiguration {
 export interface Category {
   id: string;
   name: string;
-  color: 'rose' | 'blue' | 'purple' | 'green' | 'amber';
+  color: ColorName;
   enrichmentPrompt: string; // Prompt used to enrich notes in this category
+  noEnrichment?: boolean; // If true, this is a manual category without AI enrichment
 }
 
 /**

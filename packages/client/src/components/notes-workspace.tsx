@@ -4,9 +4,9 @@ import { CommandPalette } from "@/components/command-palette";
 import { NoteEditor } from "@/components/note-editor";
 import { NotesTree } from "@/components/notes-tree";
 import { SettingsDialog } from "@/components/settings-dialog";
-import type { Category, Tag, Note } from "@/lib/types";
+import { CategorySelectionModal } from "@/components/category-selection-modal";
+import type { Note } from "@/lib/types";
 import { useNotesStore, useTagsStore, useCategoriesStore } from "@/lib/store";
-import { useSettings } from "@/hooks/use-settings";
 import { useState, useEffect, useMemo } from "react";
 
 export function NotesWorkspace() {
@@ -52,6 +52,7 @@ export function NotesWorkspace() {
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [showCategorySelection, setShowCategorySelection] = useState(false);
 
   // Load notes, tags, and categories on mount
   useEffect(() => {
@@ -65,6 +66,7 @@ export function NotesWorkspace() {
         setSelectedNoteId(orderedNoteIds[0]);
       }
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedNote = selectedNoteId ? getNote(selectedNoteId) ?? null : null;
@@ -77,11 +79,16 @@ export function NotesWorkspace() {
   };
 
   const handleCreateNote = async () => {
-    // Create new note with empty content blocks
+    // Show category selection modal
+    setShowCategorySelection(true);
+  };
+
+  const handleCategorySelected = async (categoryId: string | null) => {
+    // Create new note with selected category
     const noteId = await createNote({
       title: "Untitled Note",
       contentBlocks: [],
-      categories: [],
+      category: categoryId || undefined, // null = Auto Classify, undefined = no category
       tags: { user: [], system: [] },
     });
     setSelectedNoteId(noteId);
@@ -107,10 +114,10 @@ export function NotesWorkspace() {
     await deleteCategory(categoryId);
     // Remove category from all notes
     notes.forEach((note) => {
-      if (note.categories.includes(categoryId)) {
+      if (note.category === categoryId) {
         updateNote(note.id, (n) => ({
           ...n,
-          categories: n.categories.filter((id) => id !== categoryId),
+          category: undefined,
         }));
       }
     });
@@ -136,10 +143,10 @@ export function NotesWorkspace() {
     // Add the newly created category to the pending note
     if (pendingCategoryNoteId) {
       const note = getNote(pendingCategoryNoteId);
-      if (note && !note.categories.includes(categoryId)) {
+      if (note && note.category !== categoryId) {
         await updateNote(pendingCategoryNoteId, (n) => ({
           ...n,
-          categories: [...n.categories, categoryId],
+          category: categoryId,
         }));
       }
     }
@@ -158,10 +165,15 @@ export function NotesWorkspace() {
       // Search in note titles and content blocks
       const results = notes
         .filter((note) => {
-          const titleMatch = note.title.toLowerCase().includes(query.toLowerCase());
-          const contentMatch = note.contentBlocks.some((block) => {
+          const titleMatch = note.title?.toLowerCase().includes(query.toLowerCase());
+          const contentMatch = note.contentBlocks?.some((block) => {
             if (block.type === 'p' || block.type === 'h1' || block.type === 'h2') {
-              return JSON.stringify(block.content).toLowerCase().includes(query.toLowerCase());
+              try {
+                const content = JSON.stringify(block.content);
+                return content?.toLowerCase().includes(query.toLowerCase());
+              } catch {
+                return false;
+              }
             }
             return false;
           });
@@ -259,6 +271,13 @@ export function NotesWorkspace() {
         onCategoryCreated={handleCategoryCreated}
         preSelectTab={settingsPreSelect}
         preFillCategoryName={settingsPreFillCategory}
+      />
+
+      <CategorySelectionModal
+        open={showCategorySelection}
+        onOpenChange={setShowCategorySelection}
+        categories={categories}
+        onSelect={handleCategorySelected}
       />
     </div>
   );

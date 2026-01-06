@@ -318,10 +318,9 @@ export function NoteEditor({
 
   const handleToggleCategory = (categoryId: string) => {
     if (!noteId || !note) return;
-    const newCategories = note.categories.includes(categoryId)
-      ? note.categories.filter((id) => id !== categoryId)
-      : [...note.categories, categoryId];
-    onUpdateNote(noteId, { categories: newCategories });
+    // If same category, remove it; otherwise set it
+    const newCategory = note.category === categoryId ? undefined : categoryId;
+    onUpdateNote(noteId, { category: newCategory });
   };
 
   const handleRemoveTag = (tagId: string, e: React.MouseEvent) => {
@@ -339,7 +338,7 @@ export function NoteEditor({
     e.stopPropagation();
     if (!noteId || !note) return;
     onUpdateNote(noteId, {
-      categories: note.categories.filter((id) => id !== categoryId),
+      category: undefined,
     });
   };
 
@@ -392,9 +391,9 @@ export function NoteEditor({
     // Create category and get the actual ID
     const categoryId = await onAddCategory(newCategory);
 
-    // Add category to note
+    // Set as note's category
     await onUpdateNote(noteId, {
-      categories: [...note.categories, categoryId],
+      category: categoryId,
     });
 
     // Reset states
@@ -429,13 +428,13 @@ export function NoteEditor({
 
   const filteredCategories = useMemo(() => {
     if (!categoryFilter.trim())
-      return categories.filter((cat) => !note?.categories.includes(cat.id));
+      return categories.filter((cat) => cat.id !== note?.category);
     return categories.filter(
       (cat) =>
-        !note?.categories.includes(cat.id) &&
+        cat.id !== note?.category &&
         cat.name.toLowerCase().includes(categoryFilter.toLowerCase())
     );
-  }, [categories, categoryFilter, note?.categories]);
+  }, [categories, categoryFilter, note?.category]);
 
   // Compute selected indices directly instead of using useEffect
   const computedCategoryIndex = useMemo(() => {
@@ -510,7 +509,7 @@ export function NoteEditor({
   }
 
   const noteTags = tags.filter((tag) => note.tags.user.includes(tag.id));
-  const noteCategories = categories.filter((cat) => note.categories.includes(cat.id));
+  const noteCategory = note.category ? categories.find((cat) => cat.id === note.category) : undefined;
 
   return (
     <div className="flex-1 flex flex-col px-0 md:px-4 pb-3 min-h-0 notes-section">
@@ -644,137 +643,139 @@ export function NoteEditor({
         <div className="p-3 border-t border-border bg-muted space-y-2">
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-muted-foreground">CATEGORIES</span>
+              <span className="text-xs font-medium text-muted-foreground">CATEGORY</span>
             </div>
             <div className="flex flex-wrap gap-1.5">
-              {noteCategories.map((category) => (
+              {noteCategory && (
                 <button
-                  key={category.id}
-                  onClick={(e) => handleCategoryClick(category.id, e)}
+                  key={noteCategory.id}
+                  onClick={(e) => handleCategoryClick(noteCategory.id, e)}
                   className={cn(
                     "group px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1",
-                    tagColorClasses[category.color as keyof typeof tagColorClasses]
+                    tagColorClasses[noteCategory.color as keyof typeof tagColorClasses]
                   )}
                 >
-                  {category.name}
+                  {noteCategory.name}
                   <X
                     className="h-3 w-3 transition-opacity"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
-                      handleRemoveCategory(category.id, e);
+                      handleRemoveCategory(noteCategory.id, e);
                     }}
                   />
                 </button>
-              ))}
+              )}
 
-              <Popover
-                open={isAddingCategory}
-                onOpenChange={(open) => {
-                  setIsAddingCategory(open);
-                  if (!open) {
-                    setCategoryFilter("");
-                    setSelectedCategoryIndex(-1);
-                  }
-                }}
-              >
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
-                    <Plus className="h-3.5 w-3.5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-56 p-2" align="start">
-                  <div className="space-y-2">
-                    <div className="text-xs font-medium text-muted-foreground mb-2">
-                      Add Category
-                    </div>
-                    <Input
-                      value={categoryFilter}
-                      onChange={(e) => {
-                        setCategoryFilter(e.target.value);
-                        // Reset manual selection when typing
-                        if (selectedCategoryIndex !== -1) {
-                          setSelectedCategoryIndex(-1);
-                        }
-                      }}
-                      onKeyDown={(e) => {
-                        const maxIndex = filteredCategories.length > 0 ? filteredCategories.length - 1 : 0;
-                        const currentIndex = selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex;
-                        
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setSelectedCategoryIndex((prev) => {
-                            const current = prev === -1 ? computedCategoryIndex : prev;
-                            return Math.min(current + 1, maxIndex);
-                          });
-                        } else if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setSelectedCategoryIndex((prev) => {
-                            const current = prev === -1 ? computedCategoryIndex : prev;
-                            return Math.max(current - 1, -1);
-                          });
-                        } else if (e.key === "Enter") {
-                          e.preventDefault();
-                          const indexToUse = selectedCategoryIndex !== -1 ? selectedCategoryIndex : computedCategoryIndex;
-                          if (filteredCategories.length > 0 && indexToUse >= 0) {
-                            // Select existing category
-                            handleToggleCategory(filteredCategories[indexToUse].id);
-                            setIsAddingCategory(false);
-                            setCategoryFilter("");
-                            setSelectedCategoryIndex(-1);
-                          } else if (categoryFilter.trim() && filteredCategories.length === 0) {
-                            // Add new category
-                            handleOpenCategoryModal();
+              {!noteCategory && (
+                <Popover
+                  open={isAddingCategory}
+                  onOpenChange={(open) => {
+                    setIsAddingCategory(open);
+                    if (!open) {
+                      setCategoryFilter("");
+                      setSelectedCategoryIndex(-1);
+                    }
+                  }}
+                >
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 rounded-full">
+                      <Plus className="h-3.5 w-3.5" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-56 p-2" align="start">
+                    <div className="space-y-2">
+                      <div className="text-xs font-medium text-muted-foreground mb-2">
+                        Add Category
+                      </div>
+                      <Input
+                        value={categoryFilter}
+                        onChange={(e) => {
+                          setCategoryFilter(e.target.value);
+                          // Reset manual selection when typing
+                          if (selectedCategoryIndex !== -1) {
                             setSelectedCategoryIndex(-1);
                           }
-                        }
-                      }}
-                      placeholder="Search or add category..."
-                      className="h-8 text-sm"
-                      autoFocus
-                    />
-                    <div className="space-y-1 max-h-40 overflow-y-auto">
-                      {filteredCategories.length > 0 ? (
-                        filteredCategories.map((category, index) => {
-                          const isSelected = (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === index;
-                          return (
-                            <button
-                              key={category.id}
-                              onClick={() => {
-                                handleToggleCategory(category.id);
-                                setIsAddingCategory(false);
-                                setCategoryFilter("");
-                                setSelectedCategoryIndex(-1);
-                              }}
-                              className={cn(
-                                "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
-                                isSelected && "bg-accent"
-                              )}
-                            >
-                              {category.name}
-                            </button>
-                          );
-                        })
-                      ) : categoryFilter.trim() ? (
-                        <button
-                          onClick={handleOpenCategoryModal}
-                          className={cn(
-                            "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
-                            (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === 0 && "bg-accent"
-                          )}
-                        >
-                          <Plus className="h-3.5 w-3.5 inline mr-2" />
-                          Add Category "{categoryFilter}"
-                        </button>
-                      ) : (
-                        <p className="text-xs text-muted-foreground text-center py-2">
-                          Type to search or add
-                        </p>
-                      )}
+                        }}
+                        onKeyDown={(e) => {
+                          const maxIndex = filteredCategories.length > 0 ? filteredCategories.length - 1 : 0;
+                          const currentIndex = selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex;
+                          
+                          if (e.key === "ArrowDown") {
+                            e.preventDefault();
+                            setSelectedCategoryIndex((prev) => {
+                              const current = prev === -1 ? computedCategoryIndex : prev;
+                              return Math.min(current + 1, maxIndex);
+                            });
+                          } else if (e.key === "ArrowUp") {
+                            e.preventDefault();
+                            setSelectedCategoryIndex((prev) => {
+                              const current = prev === -1 ? computedCategoryIndex : prev;
+                              return Math.max(current - 1, -1);
+                            });
+                          } else if (e.key === "Enter") {
+                            e.preventDefault();
+                            const indexToUse = selectedCategoryIndex !== -1 ? selectedCategoryIndex : computedCategoryIndex;
+                            if (filteredCategories.length > 0 && indexToUse >= 0) {
+                              // Select existing category
+                              handleToggleCategory(filteredCategories[indexToUse].id);
+                              setIsAddingCategory(false);
+                              setCategoryFilter("");
+                              setSelectedCategoryIndex(-1);
+                            } else if (categoryFilter.trim() && filteredCategories.length === 0) {
+                              // Add new category
+                              handleOpenCategoryModal();
+                              setSelectedCategoryIndex(-1);
+                            }
+                          }
+                        }}
+                        placeholder="Search or add category..."
+                        className="h-8 text-sm"
+                        autoFocus
+                      />
+                      <div className="space-y-1 max-h-40 overflow-y-auto">
+                        {filteredCategories.length > 0 ? (
+                          filteredCategories.map((category, index) => {
+                            const isSelected = (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === index;
+                            return (
+                              <button
+                                key={category.id}
+                                onClick={() => {
+                                  handleToggleCategory(category.id);
+                                  setIsAddingCategory(false);
+                                  setCategoryFilter("");
+                                  setSelectedCategoryIndex(-1);
+                                }}
+                                className={cn(
+                                  "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors",
+                                  isSelected && "bg-accent"
+                                )}
+                              >
+                                {category.name}
+                              </button>
+                            );
+                          })
+                        ) : categoryFilter.trim() ? (
+                          <button
+                            onClick={handleOpenCategoryModal}
+                            className={cn(
+                              "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
+                              (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === 0 && "bg-accent"
+                            )}
+                          >
+                            <Plus className="h-3.5 w-3.5 inline mr-2" />
+                            Add Category "{categoryFilter}"
+                          </button>
+                        ) : (
+                          <p className="text-xs text-muted-foreground text-center py-2">
+                            Type to search or add
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                </PopoverContent>
-              </Popover>
+                  </PopoverContent>
+                </Popover>
+              )}
             </div>
           </div>
 

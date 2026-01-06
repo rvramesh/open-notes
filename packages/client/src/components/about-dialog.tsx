@@ -1,30 +1,75 @@
 "use client";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useState, useEffect } from "react";
 
 interface AboutDialogProps {
   onClose: () => void;
 }
 
+interface LibraryInfo {
+  name: string;
+  version: string;
+  repository?: string;
+  homepage?: string;
+}
+
+interface LicenseInfo {
+  name: string;
+  url: string;
+}
+
+interface LibrariesData {
+  metadata: {
+    generatedOn: string;
+    totalPackages: number;
+    approvedLicenses: number;
+    flaggedLicenses: number;
+  };
+  licenses: Record<string, LibraryInfo[]>;
+  approvedLicenses: LicenseInfo[];
+}
+
 export function AboutDialog({ onClose }: AboutDialogProps) {
-  const libraries = [
-    { name: "Next.js", version: "15.x", description: "React framework for production" },
-    {
-      name: "React",
-      version: "19.x",
-      description: "JavaScript library for building user interfaces",
-    },
-    { name: "TypeScript", version: "5.x", description: "Typed superset of JavaScript" },
-    { name: "Tailwind CSS", version: "4.x", description: "Utility-first CSS framework" },
-    { name: "Lexical", version: "Latest", description: "Extensible text editor framework" },
-    { name: "Radix UI", version: "Latest", description: "Unstyled, accessible UI components" },
-    { name: "Lucide React", version: "Latest", description: "Beautiful & consistent icon toolkit" },
-    { name: "date-fns", version: "Latest", description: "Modern JavaScript date utility library" },
-  ];
+  const [librariesData, setLibrariesData] = useState<LibrariesData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isElectron, setIsElectron] = useState(false);
+
+  useEffect(() => {
+    // Detect if running in Electron
+    const inElectron = !!(window as Window & typeof globalThis & { electronAPI?: { openExternal: (url: string) => Promise<void> } }).electronAPI || navigator.userAgent.includes("Electron");
+    setIsElectron(inElectron);
+
+    fetch("/libraries.json")
+      .then((res) => res.json())
+      .then((data) => {
+        setLibrariesData(data);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Failed to load libraries.json:", error);
+        setLoading(false);
+      });
+  }, []);
+
+  const handleLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, url: string) => {
+    if (isElectron) {
+      e.preventDefault();
+      // Use Electron's shell API to open the default browser
+      const electronAPI = (window as Window & typeof globalThis & { electronAPI?: { openExternal: (url: string) => Promise<void> } }).electronAPI;
+      if (electronAPI?.openExternal) {
+        electronAPI.openExternal(url).catch((error) => {
+          console.error("Failed to open URL:", error);
+        });
+      }
+    }
+    // If not in Electron, let the default link behavior handle it
+  };
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[85vh]">
+      <DialogContent className="max-w-3xl max-h-[85vh]">
         <DialogHeader>
           <DialogTitle>About Open Notes</DialogTitle>
         </DialogHeader>
@@ -48,24 +93,103 @@ export function AboutDialog({ onClose }: AboutDialogProps) {
           {/* Libraries */}
           <div>
             <h3 className="text-sm font-semibold text-foreground mb-3">
-              Open Source Libraries & Tools
+              Open Source Libraries & Licenses
             </h3>
-            <div className="space-y-3">
-              {libraries.map((lib) => (
-                <div key={lib.name} className="border border-border rounded-md p-3 bg-card">
-                  <div className="flex items-start justify-between mb-1">
-                    <h4 className="font-medium text-sm text-foreground">{lib.name}</h4>
-                    <span className="text-xs text-muted-foreground font-mono">{lib.version}</span>
+            
+            {loading ? (
+              <div className="text-center py-8 text-muted-foreground">
+                Loading library information...
+              </div>
+            ) : librariesData ? (
+              <div className="space-y-4">
+                {/* Metadata Summary */}
+                <div className="bg-muted/50 rounded-md p-3 text-xs space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Packages:</span>
+                    <span className="font-semibold text-foreground">
+                      {librariesData.metadata.totalPackages}
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{lib.description}</p>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Approved Licenses:</span>
+                    <span className="font-semibold text-foreground">
+                      {librariesData.metadata.approvedLicenses}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Last Updated:</span>
+                    <span className="font-semibold text-foreground">
+                      {librariesData.metadata.generatedOn}
+                    </span>
+                  </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Libraries by License */}
+                <ScrollArea className="h-96 pr-4">
+                  <div className="space-y-4">
+                    {Object.entries(librariesData.licenses).map(([license, libraries]) => (
+                      <div key={license}>
+                        <h4 className="text-xs font-semibold text-foreground mb-2 flex items-center gap-2">
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary rounded">
+                            {license}
+                          </span>
+                          <span className="text-muted-foreground font-normal">
+                            ({libraries.length} {libraries.length === 1 ? "package" : "packages"})
+                          </span>
+                          {librariesData.approvedLicenses && (
+                            <a
+                              href={librariesData.approvedLicenses.find(l => l.name === license)?.url}
+                              onClick={(e) => handleLinkClick(e, librariesData.approvedLicenses.find(l => l.name === license)?.url || "")}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary hover:underline text-xs ml-auto flex items-center gap-1"
+                              title="View license details"
+                            >
+                              📄 View License
+                            </a>
+                          )}
+                        </h4>
+                        <div className="space-y-2 ml-2">
+                          {libraries.map((lib) => (
+                            <div
+                              key={`${lib.name}-${lib.version}`}
+                              className="border border-border rounded-md p-2 bg-card text-xs"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <span className="font-medium text-foreground">{lib.name}</span>
+                                  <span className="text-muted-foreground ml-2">v{lib.version}</span>
+                                </div>
+                                {lib.homepage && (
+                                  <a
+                                    href={lib.homepage}
+                                    onClick={(e) => handleLinkClick(e, lib.homepage!)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary hover:underline shrink-0 cursor-pointer"
+                                  >
+                                    Website
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Failed to load library information
+              </div>
+            )}
           </div>
 
           {/* Footer */}
           <div className="pt-4 border-t border-border text-center text-xs text-muted-foreground">
-            Built with ❤️ using modern web technologies
+            Built with ❤️ using modern open source technologies
           </div>
         </div>
       </DialogContent>

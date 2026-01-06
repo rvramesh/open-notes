@@ -22,3 +22,8 @@ contextBridge.exposeInMainWorld("ipcRenderer", {
   // You can expose other APTs you need here.
   // ...
 });
+
+// Expose shell.openExternal for opening URLs in default browser
+contextBridge.exposeInMainWorld("electronAPI", {
+  openExternal: (url: string) => ipcRenderer.invoke("open-external", url),
+});

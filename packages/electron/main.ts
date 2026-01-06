@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -34,6 +34,11 @@ const HOST = "127.0.0.1";
 const PORT = 3000;
 const serverUrl = `http://${HOST}:${PORT}`;
 ipcMain.handle("get-server-url", () => serverUrl);
+
+// Handle opening external URLs in the default browser
+ipcMain.handle("open-external", (_event, url: string) => {
+  return shell.openExternal(url);
+});
 
 async function createWindow() {
   win = new BrowserWindow({

@@ -18,6 +18,19 @@ const APPROVED_LICENSES = [
   'CC0-1.0',
 ];
 
+// License URLs
+const LICENSE_URLS = {
+  'MIT': 'https://opensource.org/licenses/MIT',
+  'Apache-2.0': 'https://opensource.org/licenses/Apache-2.0',
+  'ISC': 'https://opensource.org/licenses/ISC',
+  'BSD-2-Clause': 'https://opensource.org/licenses/BSD-2-Clause',
+  'BSD-3-Clause': 'https://opensource.org/licenses/BSD-3-Clause',
+  'WTFPL': 'http://www.wtfpl.net/',
+  '0BSD': 'https://opensource.org/licenses/0BSD',
+  'Unlicense': 'https://unlicense.org/',
+  'CC0-1.0': 'https://creativecommons.org/publicdomain/zero/1.0/',
+};
+
 // Function to get license info for a package
 function getLicenseInfo(packageName) {
   try {
@@ -201,6 +214,12 @@ function generateJSON(licenseData, flaggedLicenses) {
     });
   });
 
+  // Build approvedLicenses with URLs
+  const approvedLicensesWithUrls = APPROVED_LICENSES.map(license => ({
+    name: license,
+    url: LICENSE_URLS[license] || '#',
+  }));
+
   return {
     metadata: {
       generatedOn: new Date().toISOString().split('T')[0],
@@ -210,7 +229,7 @@ function generateJSON(licenseData, flaggedLicenses) {
     },
     licenses: approvedByLicense,
     flaggedLicenses: flaggedByLicense,
-    approvedLicenses: APPROVED_LICENSES,
+    approvedLicenses: approvedLicensesWithUrls,
   };
 }
 

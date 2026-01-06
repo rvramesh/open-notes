@@ -33,8 +33,10 @@ export class LocalStorageCategoriesAdapter implements CategoriesPersistenceAdapt
     const categoryIds = new Set<string>();
 
     // Collect all unique category IDs from notes
-    notes.forEach(note => {
-      note.categories.forEach(catId => categoryIds.add(catId));
+    notes.forEach((note) => {
+      if (note.category) {
+        categoryIds.add(note.category);
+      }
     });
 
     if (categoryIds.size === 0) {

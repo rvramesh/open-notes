@@ -70,7 +70,7 @@ export function NotesTree({
 
   const renderCategoryView = () => {
     const categoryElements = categories.map((category) => {
-      const categoryNotes = notes.filter((note) => note.categories.includes(category.id));
+      const categoryNotes = notes.filter((note) => note.category === category.id);
       const isExpanded = expandedCategories.has(category.id);
 
       return (
@@ -104,7 +104,7 @@ export function NotesTree({
     });
 
     // Add Uncategorized section for notes without any categories
-    const uncategorizedNotes = notes.filter((note) => note.categories.length === 0);
+    const uncategorizedNotes = notes.filter((note) => !note.category);
     if (uncategorizedNotes.length > 0) {
       const isUncategorizedExpanded = expandedCategories.has("uncategorized");
       categoryElements.push(
