@@ -53,7 +53,8 @@ export interface Category {
   id: string;
   name: string;
   color: ColorName;
-  aiPrompt: string;
+  enrichmentPrompt: string;
+  noEnrichment: boolean; // If true, notes in this category won't be shared with AI for enrichment
 }
 
 // Model Configuration for AI

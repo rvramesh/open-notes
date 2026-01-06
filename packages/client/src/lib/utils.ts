@@ -37,3 +37,9 @@ export function formatRelativeTime(date: Date | string | number): string {
   const diffInYears = Math.floor(diffInMonths / 12);
   return diffInYears === 1 ? "1 year ago" : `${diffInYears} years ago`;
 }
+
+export function isMacOS(): boolean {
+  if (typeof window === "undefined") return false;
+  return /Mac|iPhone|iPad|iPod/.test(navigator.platform) || 
+         /Mac|iPhone|iPad|iPod/.test(navigator.userAgent);
+}

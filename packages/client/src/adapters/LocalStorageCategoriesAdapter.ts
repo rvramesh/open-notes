@@ -46,7 +46,8 @@ export class LocalStorageCategoriesAdapter implements CategoriesPersistenceAdapt
       id,
       name: `Category ${id}`,
       color: getRandomColor(),
-      aiPrompt: 'Provide insights and context relevant to this category.',
+      enrichmentPrompt: 'Provide insights and context relevant to this category.',
+      noEnrichment: false,
     }));
 
     // Save the generated categories

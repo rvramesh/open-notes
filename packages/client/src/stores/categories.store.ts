@@ -42,13 +42,14 @@ export function createCategoriesStore(adapter: CategoriesPersistenceAdapter) {
     error: null,
 
     // Create category
-    createCategory: async (name: string, aiPrompt?: string): Promise<string> => {
+    createCategory: async (name: string, enrichmentPrompt?: string): Promise<string> => {
       const id = `cat-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
       const category: Category = {
         id,
         name,
         color: getRandomColor(),
-        aiPrompt: aiPrompt || 'Provide insights and context relevant to this category.',
+        enrichmentPrompt: enrichmentPrompt || 'Provide insights and context relevant to this category.',
+        noEnrichment: false,
       };
 
       // Update local state

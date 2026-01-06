@@ -5,8 +5,9 @@ import { NoteEditor } from "@/components/note-editor";
 import { NotesTree } from "@/components/notes-tree";
 import { SettingsDialog } from "@/components/settings-dialog";
 import type { Category, Tag, Note } from "@/lib/types";
-import { useNotesStore, useCategoriesStore, useTagsStore } from "@/lib/store";
-import { useState, useEffect } from "react";
+import { useNotesStore, useTagsStore, useCategoriesStore } from "@/lib/store";
+import { useSettings } from "@/hooks/use-settings";
+import { useState, useEffect, useMemo } from "react";
 
 export function NotesWorkspace() {
   // Store state - use stable selectors
@@ -22,11 +23,10 @@ export function NotesWorkspace() {
 
   // Categories store
   const categoriesMap = useCategoriesStore((state) => state.categories);
+  const categories = useMemo(() => Object.values(categoriesMap), [categoriesMap]);
   const createCategory = useCategoriesStore((state) => state.createCategory);
-  const updateCategory = useCategoriesStore((state) => state.updateCategory);
   const deleteCategory = useCategoriesStore((state) => state.deleteCategory);
   const refreshCategories = useCategoriesStore((state) => state.refreshFromAdapter);
-  const categories = Object.values(categoriesMap);
 
   // Tags store
   const addTag = useTagsStore((state) => state.addTag);
@@ -53,12 +53,12 @@ export function NotesWorkspace() {
   const [searchResults, setSearchResults] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
 
-  // Load notes, categories, and tags on mount
+  // Load notes, tags, and categories on mount
   useEffect(() => {
     Promise.all([
       refreshFromAdapter(),
-      refreshCategories(),
       refreshTags(),
+      refreshCategories(),
     ]).then(() => {
       // Select first note if available
       if (orderedNoteIds.length > 0 && !selectedNoteId) {
@@ -243,7 +243,7 @@ export function NotesWorkspace() {
             const normalizedTag = await addTag(tagName);
             return normalizedTag;
           }}
-          onAddCategory={async (category) => await createCategory(category.name, category.aiPrompt)}
+          onAddCategory={async (category) => await createCategory(category.name, category.enrichmentPrompt)}
           onRemoveTag={handleRemoveTag}
           onRemoveCategory={handleRemoveCategory}
           onOpenSettingsWithCategory={handleOpenSettingsWithCategory}
@@ -256,7 +256,6 @@ export function NotesWorkspace() {
       <SettingsDialog
         isOpen={isSettingsOpen}
         onClose={handleCloseSettings}
-        categories={categories}
         onCategoryCreated={handleCategoryCreated}
         preSelectTab={settingsPreSelect}
         preFillCategoryName={settingsPreFillCategory}

@@ -18,10 +18,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Category, Note, Tag } from "@/lib/types";
-import { cn, formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime, isMacOS } from "@/lib/utils";
 import { normalizeTag, getTagColor } from "@/lib/tag-utils";
 import {
   AlertTriangle,
@@ -39,6 +49,8 @@ import type React from "react";
 import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { debounce } from "lodash";
 import { PlateEditor } from "./plate-editor";
+import { useSettings } from "@/hooks/use-settings";
+import { CategoryModal } from "@/components/category-modal";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -47,7 +59,7 @@ interface NoteEditorProps {
   categories: Category[];
   onUpdateNote: (noteId: string, updates: Partial<Note>) => Promise<void>;
   onAddTag: (tagName: string) => Promise<string>;
-  onAddCategory: (category: Category) => void;
+  onAddCategory: (category: Category) => Promise<string>;
   onRemoveTag: (tagId: string) => void;
   onRemoveCategory: (categoryId: string) => void;
   onOpenSettingsWithCategory?: (categoryName: string) => void;
@@ -108,7 +120,12 @@ export function NoteEditor({
   const [selectedTagIndex, setSelectedTagIndex] = useState(-1);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Category modal states
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [modalCategoryData, setModalCategoryData] = useState<Pick<Category, "name" | "enrichmentPrompt" | "noEnrichment"> | null>(null);
+
   const [hasChanges, setHasChanges] = useState(false);
+  const settings = useSettings();
   const pendingContentRef = useRef<string | null>(null);
   const saveInProgressRef = useRef<boolean>(false);
   const noteIdRef = useRef<string | null>(null);
@@ -151,9 +168,10 @@ export function NoteEditor({
     noteIdRef.current = noteId;
   }, [title, contentString, onUpdateNote, noteId]);
 
-  // Create debounced save function
-  const debouncedSave = useRef(
-    debounce(async () => {
+  // Create debounced save function using the save delay from settings (in seconds, convert to ms)
+  // Recreate when settings change
+  const debouncedSave = useMemo(() => {
+    return debounce(async () => {
       if (!noteIdRef.current || saveInProgressRef.current) return;
 
       setIsSaving(true);
@@ -186,8 +204,8 @@ export function NoteEditor({
       } finally {
         saveInProgressRef.current = false;
       }
-    }, 10000)
-  ).current;
+    }, (settings.editorSettings.autoSaveInterval || 10) * 1000);
+  }, [settings.editorSettings.autoSaveInterval]);
 
   // Cleanup debounce on unmount
   useEffect(() => {
@@ -256,7 +274,9 @@ export function NoteEditor({
     setTitle(e.target.value);
     setHasChanges(true);
     setIsSaved(false);
-    debouncedSave();
+    if (settings.editorSettings.autoSave) {
+      debouncedSave();
+    }
   };
 
   const handleTitleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -277,7 +297,9 @@ export function NoteEditor({
       pendingContentRef.current = newContent;
       setHasChanges(true);
       setIsSaved(false);
-      debouncedSave();
+      if (settings.editorSettings.autoSave) {
+        debouncedSave();
+      }
     }
   };
 
@@ -342,11 +364,57 @@ export function NoteEditor({
     }
   };
 
-  const handleAddCategoryViaSettings = () => {
-    if (categoryFilter.trim() && onOpenSettingsWithCategory) {
-      onOpenSettingsWithCategory(categoryFilter.trim());
-      setIsAddingCategory(false);
-      setCategoryFilter("");
+  const handleOpenCategoryModal = () => {
+    const categoryName = categoryFilter.trim();
+    if (!categoryName) return;
+    
+    setModalCategoryData({
+      name: categoryName,
+      enrichmentPrompt: "",
+      noEnrichment: false,
+    });
+    setCategoryModalOpen(true);
+    setIsAddingCategory(false);
+  };
+
+  const handleModalCategorySave = async () => {
+    if (!modalCategoryData || !noteId || !note) return;
+    if (!modalCategoryData.name.trim()) return;
+
+    const newCategory: Category = {
+      id: `temp-${Date.now()}`,
+      name: modalCategoryData.name,
+      color: "blue",
+      enrichmentPrompt: modalCategoryData.enrichmentPrompt,
+      noEnrichment: modalCategoryData.noEnrichment,
+    };
+
+    // Create category and get the actual ID
+    const categoryId = await onAddCategory(newCategory);
+
+    // Add category to note
+    await onUpdateNote(noteId, {
+      categories: [...note.categories, categoryId],
+    });
+
+    // Reset states
+    setCategoryModalOpen(false);
+    setModalCategoryData(null);
+    setCategoryFilter("");
+  };
+
+  const handleModalCategoryCancel = () => {
+    setCategoryModalOpen(false);
+    setModalCategoryData(null);
+    setCategoryFilter("");
+  };
+
+  const handleUpdateModalCategory = (field: keyof Pick<Category, "name" | "enrichmentPrompt" | "noEnrichment">, value: string | boolean) => {
+    if (modalCategoryData) {
+      setModalCategoryData({
+        ...modalCategoryData,
+        [field]: value,
+      });
     }
   };
 
@@ -466,7 +534,12 @@ export function NoteEditor({
                   <span>•</span>
                   <div className="flex items-center gap-1 text-muted-foreground">
                     <AlertTriangle className="h-3.5 w-3.5" />
-                    <span>Unsaved changes</span>
+                    <span>
+                      Unsaved changes
+                      {!settings.editorSettings.autoSave && (
+                        <span className="ml-1 text-xs">— Press {isMacOS() ? '⌘S' : 'Ctrl+S'} to save</span>
+                      )}
+                    </span>
                   </div>
                 </>
               )}
@@ -651,7 +724,7 @@ export function NoteEditor({
                             setSelectedCategoryIndex(-1);
                           } else if (categoryFilter.trim() && filteredCategories.length === 0) {
                             // Add new category
-                            handleAddCategoryViaSettings();
+                            handleOpenCategoryModal();
                             setSelectedCategoryIndex(-1);
                           }
                         }
@@ -684,7 +757,7 @@ export function NoteEditor({
                         })
                       ) : categoryFilter.trim() ? (
                         <button
-                          onClick={handleAddCategoryViaSettings}
+                          onClick={handleOpenCategoryModal}
                           className={cn(
                             "w-full text-left px-2 py-1.5 rounded text-sm hover:bg-accent transition-colors text-primary font-medium",
                             (selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex) === 0 && "bg-accent"
@@ -861,6 +934,16 @@ export function NoteEditor({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <CategoryModal
+        open={categoryModalOpen}
+        onOpenChange={setCategoryModalOpen}
+        categoryData={modalCategoryData}
+        onUpdateCategory={handleUpdateModalCategory}
+        onSave={handleModalCategorySave}
+        onCancel={handleModalCategoryCancel}
+        isEditing={false}
+      />
     </div>
   );
 }

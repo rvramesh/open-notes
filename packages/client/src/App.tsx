@@ -27,6 +27,7 @@ function HealthStatus() {
 
 function App() {
   const [count, setCount] = useState(0);
+
   return (
     <>
       <Suspense fallback={<p>Loading health status...</p>}>

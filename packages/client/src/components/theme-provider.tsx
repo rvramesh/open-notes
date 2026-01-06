@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSettings } from "@/hooks/use-settings";
 
 type Theme = "light" | "dark" | "system";
 
@@ -25,22 +26,22 @@ export function ThemeProvider({
   defaultTheme = "system",
   enableSystem = true,
 }: ThemeProviderProps) {
-  const [theme, setThemeState] = React.useState<Theme>(() => {
-    // Try to get stored theme
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("theme") as Theme | null;
-      if (stored) return stored;
-    }
-    return defaultTheme;
-  });
+  const settings = useSettings();
+  const [theme, setThemeState] = React.useState<Theme>((settings.theme as Theme) || defaultTheme);
+
+  // Update local state when settings theme changes
+  React.useEffect(() => {
+    setThemeState(settings.theme as Theme);
+  }, [settings.theme]);
 
   const setTheme = React.useCallback((newTheme: Theme) => {
     setThemeState(newTheme);
+    // Persist to settings store (auto-saves)
+    settings.setTheme(newTheme);
     if (typeof window !== "undefined") {
-      localStorage.setItem("theme", newTheme);
       applyTheme(newTheme);
     }
-  }, []);
+  }, [settings]);
 
   React.useEffect(() => {
     if (typeof window !== "undefined") {

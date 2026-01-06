@@ -696,9 +696,7 @@ interface Category {
 interface SettingsStoreState {
   // Appearance
   theme: 'light' | 'dark' | 'system';
-  fontSize: 'small' | 'medium' | 'large';
-  fontFamily: 'system' | 'serif' | 'mono';
-
+  
   // AI configuration
   languageModel?: ModelConfiguration;
   embeddingModel?: ModelConfiguration;
