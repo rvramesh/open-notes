@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/command";
 import type { Note } from "@/lib/types";
 import { Command, PanelLeft, PanelLeftOpen, Plus, Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 
 interface CommandPaletteProps {
   notes: Note[];
@@ -69,17 +69,20 @@ export function CommandPalette({
     return () => document.removeEventListener("keydown", down);
   }, [onCreateNote]);
 
-  const filteredNotes = notes.filter((note) =>
-    note.title.toLowerCase().includes(search.toLowerCase())
+  const filteredNotes = useMemo(() => 
+    notes.filter((note) =>
+      note.title.toLowerCase().includes(search.toLowerCase())
+    ),
+    [notes, search]
   );
   const hasResults = filteredNotes.length > 0;
 
-  const handleSearchSubmit = () => {
+  const handleSearchSubmit = useCallback(() => {
     if (search.trim()) {
       onSearch(search);
       setOpen(false);
     }
-  };
+  }, [search, onSearch]);
 
   return (
     <>

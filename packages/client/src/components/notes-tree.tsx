@@ -2,7 +2,7 @@
 
 import { AboutDialog } from "@/components/about-dialog"; // Import AboutDialog component
 import { Button } from "@/components/ui/button";
-import type { Category, Note, Tag } from "@/lib/types";
+import type { Category, Note } from "@/lib/types";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { format, isThisWeek, isToday } from "date-fns";
 import {
@@ -17,13 +17,12 @@ import {
   SettingsIcon,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useCallback, memo } from "react";
 
 type ViewMode = "category" | "time" | "flat" | "search";
 
 interface NotesTreeProps {
   notes: Note[];
-  tags: Tag[];
   categories: Category[];
   selectedNoteId: string | null;
   onSelectNote: (noteId: string) => void;
@@ -36,7 +35,6 @@ interface NotesTreeProps {
 
 export function NotesTree({
   notes,
-  tags,
   categories,
   selectedNoteId,
   onSelectNote,
@@ -56,7 +54,7 @@ export function NotesTree({
 
   const effectiveViewMode = isSearchActive ? "search" : viewMode;
 
-  const toggleCategory = (categoryId: string) => {
+  const toggleCategory = useCallback((categoryId: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(categoryId)) {
@@ -66,9 +64,9 @@ export function NotesTree({
       }
       return next;
     });
-  };
+  }, []);
 
-  const renderCategoryView = () => {
+  const renderCategoryView = useCallback(() => {
     const categoryElements = categories.map((category) => {
       const categoryNotes = notes.filter((note) => note.category === category.id);
       const isExpanded = expandedCategories.has(category.id);
@@ -138,9 +136,9 @@ export function NotesTree({
     }
 
     return categoryElements;
-  };
+  }, [notes, categories, expandedCategories, selectedNoteId, onSelectNote, toggleCategory]);
 
-  const renderTimeView = () => {
+  const renderTimeView = useCallback(() => {
     // Sort notes by updatedAt in descending order (latest first)
     const sortedNotes = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
 
@@ -179,9 +177,9 @@ export function NotesTree({
         )}
       </>
     );
-  };
+  }, [notes, selectedNoteId, onSelectNote]);
 
-  const renderFlatView = () => {
+  const renderFlatView = useCallback(() => {
     return notes.map((note) => (
       <NoteItem
         key={note.id}
@@ -190,9 +188,9 @@ export function NotesTree({
         onSelect={() => onSelectNote(note.id)}
       />
     ));
-  };
+  }, [notes, selectedNoteId, onSelectNote]);
 
-  const renderSearchResults = () => {
+  const renderSearchResults = useCallback(() => {
     const displayedResults = searchResults.slice(0, displayCount);
     const hasMore = displayCount < searchResults.length;
 
@@ -244,7 +242,7 @@ export function NotesTree({
         )}
       </div>
     );
-  };
+  }, [searchResults, displayCount, selectedNoteId, onSelectNote, isLoadingMore, onClearSearch, searchQuery]);
 
   return (
     <div className="w-64 border-r border-border bg-card flex flex-col h-screen">
@@ -375,7 +373,7 @@ function TimeGroup({
   );
 }
 
-function NoteItem({
+const NoteItem = memo(function NoteItem({
   note,
   isSelected,
   onSelect,
@@ -398,9 +396,9 @@ function NoteItem({
       </span>
     </button>
   );
-}
+});
 
-function SearchResultCard({
+const SearchResultCard = memo(function SearchResultCard({
   note,
   isSelected,
   onSelect,
@@ -418,7 +416,7 @@ function SearchResultCard({
           return block.content;
         }
         if (block.content && typeof block.content === 'object' && 'text' in block.content) {
-          return (block.content as any).text;
+          return (block.content as Record<string, unknown>).text as string;
         }
         return '';
       })
@@ -445,4 +443,4 @@ function SearchResultCard({
       <div className="text-xs text-muted-foreground">{formatRelativeTime(note.updatedAt)}</div>
     </button>
   );
-}
+});

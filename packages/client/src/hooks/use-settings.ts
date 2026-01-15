@@ -4,7 +4,6 @@
  * Provides a singleton instance of the settings store with localStorage persistence.
  */
 
-import { useMemo } from 'react';
 import { createSettingsStore } from '../stores/settings.store';
 import { LocalStorageSettingsAdapter } from '../adapters/LocalStorageSettingsAdapter';
 import type { SettingsStore } from '../stores';

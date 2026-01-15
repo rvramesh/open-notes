@@ -301,7 +301,7 @@ export function SettingsDialog({
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="p-6">
-            {activeTab === "appearance" && (
+            {activeTab === "appearance" ? (
               <div className="space-y-6 max-w-xl">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Appearance Settings</h3>
@@ -331,9 +331,7 @@ export function SettingsDialog({
                   </p>
                 </div>
               </div>
-            )}
-
-            {activeTab === "editor" && (
+            ) : activeTab === "editor" ? (
               <div className="space-y-6 max-w-xl">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Editor Settings</h3>
@@ -398,9 +396,7 @@ export function SettingsDialog({
                   </p>
                 </div>
               </div>
-            )}
-
-            {activeTab === "ai" && (
+            ) : activeTab === "ai" ? (
               <div className="space-y-6 max-w-xl">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">Model Configuration</h3>
@@ -621,9 +617,7 @@ export function SettingsDialog({
                   </AccordionItem>
                 </Accordion>
               </div>
-            )}
-
-            {activeTab === "prompts" && (
+            ) : activeTab === "prompts" ? (
               <div className="space-y-6 max-w-2xl">
                 <div>
                   <h3 className="text-lg font-semibold mb-4">AI Prompts</h3>
@@ -656,9 +650,7 @@ export function SettingsDialog({
                   </p>
                 </div>
               </div>
-            )}
-
-            {activeTab === "categories" && (
+            ) : activeTab === "categories" ? (
               <div className="flex flex-col h-full overflow-hidden">
                 <ScrollArea className="flex-1 min-h-0">
                   <div className="pr-4 space-y-6">
@@ -784,7 +776,7 @@ export function SettingsDialog({
                   </div>
                 </ScrollArea>
               </div>
-            )}
+            ) : null}
           </div>
             </ScrollArea>
           </div>

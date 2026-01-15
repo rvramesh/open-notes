@@ -25,6 +25,17 @@ export const PlateEditor = React.forwardRef<
   // This ensures the editor resets with the new note's content
   const editorKey = React.useMemo(() => noteId || "default", [noteId]);
 
+  // Track initialization to skip first onChange call
+  const isInitializedRef = React.useRef<boolean>(false);
+  const debounceTimerRef = React.useRef<NodeJS.Timeout | null>(null);
+  const lastValueRef = React.useRef<string>(JSON.stringify(initialValue));
+
+  // Reset initialization flag when noteId changes
+  React.useEffect(() => {
+    isInitializedRef.current = false;
+    lastValueRef.current = JSON.stringify(initialValue);
+  }, [noteId, initialValue]);
+
   // Add editorKey to the editor creation so it recreates when key changes
   const editor = usePlateEditor({
     id: editorKey, // Use unique ID to force editor recreation
@@ -32,43 +43,41 @@ export const PlateEditor = React.forwardRef<
     value: initialValue,
   });
 
-  // Track the last serialized value to avoid duplicate onChange calls
-  const lastValueRef = React.useRef<string>(JSON.stringify(initialValue));
-  const isInitializedRef = React.useRef<boolean>(false);
-
-  // Effect: Listen for editor value changes and notify parent
+  // Listen for editor changes using polling (more compatible with Plate.js)
   React.useEffect(() => {
     if (!editor) return;
 
-    // Debounce timer for onChange callback
-    let debounceTimer: NodeJS.Timeout;
+    const checkInterval = setInterval(() => {
+      const currentValue = JSON.stringify(editor.children);
+      
+      // Skip the first check which happens on mount
+      if (!isInitializedRef.current) {
+        isInitializedRef.current = true;
+        lastValueRef.current = currentValue;
+        return;
+      }
 
-    // Create a listener function for value changes
-    const checkForChanges = () => {
-      debounceTimer = setTimeout(() => {
-        const currentValue = JSON.stringify(editor.children);
+      // Only trigger onChange if value actually changed
+      if (currentValue !== lastValueRef.current) {
+        lastValueRef.current = currentValue;
         
-        // Skip the first comparison to avoid firing onChange during initialization
-        if (!isInitializedRef.current) {
-          isInitializedRef.current = true;
-          lastValueRef.current = currentValue;
-          return;
+        // Clear existing debounce timer
+        if (debounceTimerRef.current) {
+          clearTimeout(debounceTimerRef.current);
         }
-        
-        if (currentValue !== lastValueRef.current) {
-          lastValueRef.current = currentValue;
+
+        // Debounce onChange calls to avoid excessive updates
+        debounceTimerRef.current = setTimeout(() => {
           onChange(currentValue);
-        }
-      }, 300);
-    };
-
-    // Use MutationObserver or polling to detect changes in the editor DOM
-    // For now, we'll use a polling approach with reasonable frequency
-    const pollInterval = setInterval(checkForChanges, 500);
+        }, 300);
+      }
+    }, 200); // Check more frequently (200ms instead of 500ms)
 
     return () => {
-      clearInterval(pollInterval);
-      clearTimeout(debounceTimer);
+      clearInterval(checkInterval);
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
   }, [editor, onChange]);
 

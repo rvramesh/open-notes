@@ -1,0 +1,11 @@
+{
+  "name": "@open-notes/shared",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "main": "./settings-types.ts",
+  "types": "./settings-types.ts",
+  "exports": {
+    "./settings-types": "./settings-types.ts"
+  }
+}

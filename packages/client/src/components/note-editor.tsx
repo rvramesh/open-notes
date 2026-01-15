@@ -136,12 +136,13 @@ export function NoteEditor({
   const onUpdateNoteRef = useRef(onUpdateNote);
 
   // Serialize contentBlocks to JSON string for the editor
+  // Only recompute when note changes to avoid unnecessary re-renders
   const contentString = useMemo(() => {
     if (!note || !note.contentBlocks || note.contentBlocks.length === 0) {
       return "";
     }
     return JSON.stringify(note.contentBlocks);
-  }, [note?.id, note?.contentBlocks]);
+  }, [note]);
 
   useEffect(() => {
     if (note) {
@@ -158,7 +159,7 @@ export function NoteEditor({
       setHasChanges(false);
       setIsSaved(true);
     }
-  }, [note?.id]);
+  }, [note]);
 
   // Keep refs up to date with latest values
   useEffect(() => {
@@ -270,16 +271,16 @@ export function NoteEditor({
     };
   }, [handleSaveNow]);
 
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTitle(e.target.value);
     setHasChanges(true);
     setIsSaved(false);
     if (settings.editorSettings.autoSave) {
       debouncedSave();
     }
-  };
+  }, [settings.editorSettings.autoSave, debouncedSave]);
 
-  const handleTitleKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTitleKeyDown = useCallback(async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
       e.preventDefault();
       // Save immediately
@@ -288,9 +289,9 @@ export function NoteEditor({
       const editableElement = editorContainerRef.current?.querySelector('[contenteditable="true"]') as HTMLElement;
       editableElement?.focus();
     }
-  };
+  }, [handleSaveNow]);
 
-  const handleContentChange = (newContent: string) => {
+  const handleContentChange = useCallback((newContent: string) => {
     // Only mark as changed if content actually differs
     const currentContent = contentString || "";
     if (newContent !== currentContent) {
@@ -301,9 +302,9 @@ export function NoteEditor({
         debouncedSave();
       }
     }
-  };
+  }, [contentString, settings.editorSettings.autoSave, debouncedSave]);
 
-  const handleToggleTag = (tagId: string) => {
+  const handleToggleTag = useCallback((tagId: string) => {
     if (!noteId || !note) return;
     const newUserTags = note.tags.user.includes(tagId)
       ? note.tags.user.filter((id) => id !== tagId)
@@ -314,16 +315,16 @@ export function NoteEditor({
         user: newUserTags,
       },
     });
-  };
+  }, [noteId, note, onUpdateNote]);
 
-  const handleToggleCategory = (categoryId: string) => {
+  const handleToggleCategory = useCallback((categoryId: string) => {
     if (!noteId || !note) return;
     // If same category, remove it; otherwise set it
     const newCategory = note.category === categoryId ? undefined : categoryId;
     onUpdateNote(noteId, { category: newCategory });
-  };
+  }, [noteId, note, onUpdateNote]);
 
-  const handleRemoveTag = (tagId: string, e: React.MouseEvent) => {
+  const handleRemoveTag = useCallback((tagId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!noteId || !note) return;
     onUpdateNote(noteId, {
@@ -332,17 +333,17 @@ export function NoteEditor({
         user: note.tags.user.filter((id) => id !== tagId),
       },
     });
-  };
+  }, [noteId, note, onUpdateNote]);
 
-  const handleRemoveCategory = (categoryId: string, e: React.MouseEvent) => {
+  const handleRemoveCategory = useCallback((categoryId: string, e: React.MouseEvent) => {
     e.stopPropagation();
     if (!noteId || !note) return;
     onUpdateNote(noteId, {
       category: undefined,
     });
-  };
+  }, [noteId, note, onUpdateNote]);
 
-  const handleAddTag = async () => {
+  const handleAddTag = useCallback(async () => {
     if (tagFilter.trim() && noteId && note) {
       // Normalize the tag name
       const normalizedTag = normalizeTag(tagFilter);
@@ -361,9 +362,9 @@ export function NoteEditor({
       setTagFilter("");
       setIsAddingTag(false);
     }
-  };
+  }, [tagFilter, noteId, note, onAddTag, onUpdateNote]);
 
-  const handleOpenCategoryModal = () => {
+  const handleOpenCategoryModal = useCallback(() => {
     const categoryName = categoryFilter.trim();
     if (!categoryName) return;
     
@@ -374,7 +375,7 @@ export function NoteEditor({
     });
     setCategoryModalOpen(true);
     setIsAddingCategory(false);
-  };
+  }, [categoryFilter]);
 
   const handleModalCategorySave = async () => {
     if (!modalCategoryData || !noteId || !note) return;
@@ -451,19 +452,19 @@ export function NoteEditor({
     return -1;
   }, [filteredTags.length, tagFilter, isAddingTag]);
 
-  const handleCategoryClick = (categoryId: string, e: React.MouseEvent) => {
+  const handleCategoryClick = useCallback((categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
       onSearchByCategory(categoryId);
     }
-  };
+  }, [onSearchByCategory]);
 
-  const handleTagClick = (tagId: string, e: React.MouseEvent) => {
+  const handleTagClick = useCallback((tagId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByTag) {
       onSearchByTag(tagId);
     }
-  };
+  }, [onSearchByTag]);
 
-  const handleExportPDF = () => {
+  const handleExportPDF = useCallback(() => {
     if (!note) return;
 
     // Extract text content from blocks
@@ -489,14 +490,14 @@ export function NoteEditor({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
+  }, [note]);
 
-  const handleDeleteNote = () => {
+  const handleDeleteNote = useCallback(() => {
     if (note && onDeleteNote) {
       onDeleteNote(note.id);
       setIsDeleteDialogOpen(false);
     }
-  };
+  }, [note, onDeleteNote]);
 
   if (!note) {
     return (

@@ -7,7 +7,7 @@ import { SettingsDialog } from "@/components/settings-dialog";
 import { CategorySelectionModal } from "@/components/category-selection-modal";
 import type { Note } from "@/lib/types";
 import { useNotesStore, useTagsStore, useCategoriesStore } from "@/lib/store";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 
 export function NotesWorkspace() {
   // Store state - use stable selectors
@@ -33,7 +33,7 @@ export function NotesWorkspace() {
   const removeTag = useTagsStore((state) => state.removeTag);
   const getAllTags = useTagsStore((state) => state.getAllTags);
   const refreshTags = useTagsStore((state) => state.refreshFromAdapter);
-  const tags = getAllTags();
+  const tags = useMemo(() => getAllTags(), [getAllTags]);
   
   // Derive notes array from the map (stable reference via orderedNoteIds)
   const notes = orderedNoteIds.map(id => notesMap[id]).filter((note): note is Note => note !== undefined);
@@ -69,14 +69,20 @@ export function NotesWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const selectedNote = selectedNoteId ? getNote(selectedNoteId) ?? null : null;
+  const selectedNote = useMemo(
+    () => (selectedNoteId ? getNote(selectedNoteId) ?? null : null),
+    [selectedNoteId, getNote]
+  );
 
-  const handleUpdateNote = async (noteId: string, updates: Partial<typeof selectedNote>) => {
-    await updateNote(noteId, (note) => ({
-      ...note,
-      ...updates,
-    }));
-  };
+  const handleUpdateNote = useCallback(
+    async (noteId: string, updates: Partial<typeof selectedNote>) => {
+      await updateNote(noteId, (note) => ({
+        ...note,
+        ...updates,
+      }));
+    },
+    [updateNote]
+  );
 
   const handleCreateNote = async () => {
     // Filter manual categories (noEnrichment = true)
@@ -122,72 +128,84 @@ export function NotesWorkspace() {
     setSelectedNoteId(noteId);
   };
 
-  const handleRemoveTag = async (tagId: string) => {
-    await removeTag(tagId);
-    // Remove tag from all notes
-    notes.forEach((note) => {
-      if (note.tags.user.includes(tagId)) {
-        updateNote(note.id, (n) => ({
-          ...n,
-          tags: {
-            ...n.tags,
-            user: n.tags.user.filter((id) => id !== tagId),
-          },
-        }));
+  const handleRemoveTag = useCallback(
+    async (tagId: string) => {
+      await removeTag(tagId);
+      // Remove tag from all notes
+      notes.forEach((note) => {
+        if (note.tags.user.includes(tagId)) {
+          updateNote(note.id, (n) => ({
+            ...n,
+            tags: {
+              ...n.tags,
+              user: n.tags.user.filter((id) => id !== tagId),
+            },
+          }));
+        }
+      });
+    },
+    [notes, removeTag, updateNote]
+  );
+
+  const handleRemoveCategory = useCallback(
+    async (categoryId: string) => {
+      await deleteCategory(categoryId);
+      // Remove category from all notes
+      notes.forEach((note) => {
+        if (note.category === categoryId) {
+          updateNote(note.id, (n) => ({
+            ...n,
+            category: undefined,
+          }));
+        }
+      });
+    },
+    [notes, deleteCategory, updateNote]
+  );
+
+  const handleDeleteNote = useCallback(
+    async (noteId: string) => {
+      await deleteNote(noteId);
+      // Select another note if the deleted one was selected
+      if (selectedNoteId === noteId) {
+        const remainingIds = orderedNoteIds.filter((id) => id !== noteId);
+        setSelectedNoteId(remainingIds[0] || null);
       }
-    });
-  };
+    },
+    [selectedNoteId, orderedNoteIds, deleteNote]
+  );
 
-  const handleRemoveCategory = async (categoryId: string) => {
-    await deleteCategory(categoryId);
-    // Remove category from all notes
-    notes.forEach((note) => {
-      if (note.category === categoryId) {
-        updateNote(note.id, (n) => ({
-          ...n,
-          category: undefined,
-        }));
-      }
-    });
-  };
-
-  const handleDeleteNote = async (noteId: string) => {
-    await deleteNote(noteId);
-    // Select another note if the deleted one was selected
-    if (selectedNoteId === noteId) {
-      const remainingIds = orderedNoteIds.filter((id) => id !== noteId);
-      setSelectedNoteId(remainingIds[0] || null);
-    }
-  };
-
-  const handleOpenSettingsWithCategory = (categoryName: string) => {
+  const handleOpenSettingsWithCategory = useCallback((categoryName: string) => {
     setSettingsPreSelect("categories");
     setSettingsPreFillCategory(categoryName);
     setPendingCategoryNoteId(selectedNoteId); // Track which note needs this category
     setIsSettingsOpen(true);
-  };
+  }, [selectedNoteId]);
 
-  const handleCategoryCreated = async (categoryId: string) => {
-    // Add the newly created category to the pending note
-    if (pendingCategoryNoteId) {
-      const note = getNote(pendingCategoryNoteId);
-      if (note && note.category !== categoryId) {
-        await updateNote(pendingCategoryNoteId, (n) => ({
-          ...n,
-          category: categoryId,
-        }));
+  const handleCategoryCreated = useCallback(
+    async (categoryId: string) => {
+      // Add the newly created category to the pending note
+      if (pendingCategoryNoteId) {
+        const note = getNote(pendingCategoryNoteId);
+        if (note && note.category !== categoryId) {
+          await updateNote(pendingCategoryNoteId, (n) => ({
+            ...n,
+            category: categoryId,
+          }));
+        }
       }
-    }
-  };
+    },
+    [pendingCategoryNoteId, getNote, updateNote]
+  );
 
-  const handleCloseSettings = () => {
+  const handleCloseSettings = useCallback(() => {
     setIsSettingsOpen(false);
     setSettingsPreSelect(undefined);
     setSettingsPreFillCategory(undefined);
     setPendingCategoryNoteId(null);
-  };
+  }, []);
 
-  const handleSearch = (query: string) => {
+  const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
     if (query.trim()) {
       // Search in note titles and content blocks
@@ -214,9 +232,9 @@ export function NotesWorkspace() {
       setSearchResults([]);
       setIsSearchActive(false);
     }
-  };
+  }, [notes]);
 
-  const handleSearchByCategory = (categoryId: string) => {
+  const handleSearchByCategory = useCallback((categoryId: string) => {
     const category = categories.find((cat) => cat.id === categoryId);
     if (category) {
       const results = getNotesByCategory(categoryId).map((note) => note.id);
@@ -224,9 +242,9 @@ export function NotesWorkspace() {
       setSearchResults(results);
       setIsSearchActive(true);
     }
-  };
+  }, [categories, getNotesByCategory]);
 
-  const handleSearchByTag = (tagId: string) => {
+  const handleSearchByTag = useCallback((tagId: string) => {
     const tag = tags.find((t) => t.id === tagId);
     if (tag) {
       const results = getNotesByTag(tagId).map((note) => note.id);
@@ -234,23 +252,25 @@ export function NotesWorkspace() {
       setSearchResults(results);
       setIsSearchActive(true);
     }
-  };
+  }, [tags, getNotesByTag]);
 
-  const handleClearSearch = () => {
+  const handleClearSearch = useCallback(() => {
     setSearchQuery("");
     setSearchResults([]);
     setIsSearchActive(false);
-  };
+  }, []);
 
-  // Convert search results from IDs to notes for components
-  const searchResultNotes = searchResults.map((id) => getNote(id)).filter((note): note is NonNullable<typeof note> => note !== undefined);
+  // Convert search results from IDs to notes for components - memoized
+  const searchResultNotes = useMemo(
+    () => searchResults.map((id) => getNote(id)).filter((note): note is NonNullable<typeof note> => note !== undefined),
+    [searchResults, getNote]
+  );
 
   return (
     <div className="flex h-screen bg-background overflow-hidden">
       {!isLeftBarCollapsed && (
         <NotesTree
           notes={notes}
-          tags={tags}
           categories={categories}
           selectedNoteId={selectedNoteId}
           onSelectNote={setSelectedNoteId}

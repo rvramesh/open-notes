@@ -2,7 +2,7 @@
 
 This document lists all third-party dependencies and their licenses.
 
-**Generated on:** 2026-01-06
+**Generated on:** 2026-01-15
 
 ## Summary
 
