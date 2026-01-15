@@ -5,6 +5,7 @@
  * Settings are persisted both locally and on the server
  */
 
+import { getApiBaseUrl, ensureInitialized } from '../api';
 import type { SettingsStoreState } from '../lib/settings-types';
 import type { SettingsPersistenceAdapter } from '../lib/settings-types';
 
@@ -18,10 +19,9 @@ type StorageSettings = Omit<SettingsStoreState, 'adapter' | 'isLoading' | 'error
  */
 export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
   private readonly storageKey = 'open-notes:settings';
-  private readonly serverUrl: string;
 
-  constructor(serverUrl = 'http://localhost:3001') {
-    this.serverUrl = serverUrl;
+  constructor() {
+    // Uses dynamic API base URL from api.ts
   }
 
   /**
@@ -49,12 +49,16 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
         await this.syncToServer(cleanSettings);
       } catch (serverError) {
         console.warn('Failed to sync settings to server:', serverError);
+        // Emit custom event for toast notification
+        window.dispatchEvent(new CustomEvent('api-error', { 
+          detail: { message: 'Failed to sync settings to server', error: serverError } 
+        }));
         // Don't throw - local save succeeded
       }
     } catch (error) {
-      throw new Error(
-        `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      const message = `Failed to save settings: ${error instanceof Error ? error.message : 'Unknown error'}`;
+      window.dispatchEvent(new CustomEvent('api-error', { detail: { message, error } }));
+      throw new Error(message);
     }
   }
 
@@ -72,9 +76,9 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
       const loaded = JSON.parse(json) as StorageSettings;
       return this.toStoreState(loaded);
     } catch (error) {
-      throw new Error(
-        `Failed to load settings: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
+      console.error('Failed to load settings:', error);
+      // Return null instead of throwing to allow graceful fallback to defaults
+      return null;
     }
   }
 
@@ -82,14 +86,17 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
    * Sync settings to server
    */
   private async syncToServer(settings: StorageSettings): Promise<void> {
-    // For now, we just log - implement actual sync endpoint later
-    console.log('Settings synced to server (placeholder)');
-    // Future implementation:
-    // await fetch(`${this.serverUrl}/api/settings/sync`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify(settings),
-    // });
+    await ensureInitialized();
+    const baseUrl = getApiBaseUrl();
+    const response = await fetch(`${baseUrl}/settings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings),
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Failed to sync settings to server: ${response.statusText}`);
+    }
   }
 
   /**
@@ -97,13 +104,23 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
    */
   private async loadFromServer(): Promise<SettingsStoreState | null> {
     try {
-      const response = await fetch(`${this.serverUrl}/api/settings`);
+      await ensureInitialized();
+      const baseUrl = getApiBaseUrl();
+      const response = await fetch(`${baseUrl}/settings`);
       if (!response.ok) {
+        console.warn(`Failed to load settings from server: ${response.status} ${response.statusText}`);
+        window.dispatchEvent(new CustomEvent('api-error', { 
+          detail: { message: `Failed to load settings from server: ${response.statusText}` } 
+        }));
         return null;
       }
       const settings = await response.json() as StorageSettings;
       return this.toStoreState(settings);
-    } catch {
+    } catch (error) {
+      console.error('Error loading settings from server:', error);
+      window.dispatchEvent(new CustomEvent('api-error', { 
+        detail: { message: 'Error loading settings from server', error } 
+      }));
       return null;
     }
   }

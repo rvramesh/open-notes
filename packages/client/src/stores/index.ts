@@ -18,6 +18,7 @@ export { LocalStorageNotesAdapter } from '../adapters/LocalStorageNotesAdapter';
 export type { NotesPersistenceAdapter } from '../adapters/NotesPersistenceAdapter';
 
 export { LocalStorageSettingsAdapter } from '../adapters/LocalStorageSettingsAdapter';
+export { HybridSettingsAdapter } from '../adapters/HybridSettingsAdapter';
 export type { SettingsPersistenceAdapter } from '../adapters/SettingsPersistenceAdapter';
 
 // Settings types

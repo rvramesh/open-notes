@@ -6,6 +6,7 @@ import { NotesTree } from "@/components/notes-tree";
 import { SettingsDialog } from "@/components/settings-dialog";
 import { CategorySelectionModal } from "@/components/category-selection-modal";
 import type { Note } from "@/lib/types";
+import { getTagColor } from "@/lib/tag-utils";
 import { useNotesStore, useTagsStore, useCategoriesStore } from "@/lib/store";
 import { useState, useEffect, useMemo, useCallback } from "react";
 
@@ -31,9 +32,15 @@ export function NotesWorkspace() {
   // Tags store
   const addTag = useTagsStore((state) => state.addTag);
   const removeTag = useTagsStore((state) => state.removeTag);
-  const getAllTags = useTagsStore((state) => state.getAllTags);
   const refreshTags = useTagsStore((state) => state.refreshFromAdapter);
-  const tags = useMemo(() => getAllTags(), [getAllTags]);
+  const tagsSet = useTagsStore((state) => state.tags);
+  const tags = useMemo(
+    () =>
+      Array.from(tagsSet)
+        .sort()
+        .map((tag) => ({ id: tag, name: tag, color: getTagColor(tag) })),
+    [tagsSet]
+  );
   
   // Derive notes array from the map (stable reference via orderedNoteIds)
   const notes = orderedNoteIds.map(id => notesMap[id]).filter((note): note is Note => note !== undefined);
@@ -70,8 +77,8 @@ export function NotesWorkspace() {
   }, []);
 
   const selectedNote = useMemo(
-    () => (selectedNoteId ? getNote(selectedNoteId) ?? null : null),
-    [selectedNoteId, getNote]
+    () => (selectedNoteId ? notesMap[selectedNoteId] ?? null : null),
+    [selectedNoteId, notesMap]
   );
 
   const handleUpdateNote = useCallback(
@@ -262,8 +269,11 @@ export function NotesWorkspace() {
 
   // Convert search results from IDs to notes for components - memoized
   const searchResultNotes = useMemo(
-    () => searchResults.map((id) => getNote(id)).filter((note): note is NonNullable<typeof note> => note !== undefined),
-    [searchResults, getNote]
+    () =>
+      searchResults
+        .map((id) => notesMap[id])
+        .filter((note): note is NonNullable<typeof note> => note !== undefined),
+    [searchResults, notesMap]
   );
 
   return (

@@ -102,7 +102,7 @@ export function CategoryModal({
                     onUpdateCategory("enrichmentPrompt", e.target.value)
                   }
                   placeholder="Enter custom prompt..."
-                  className="min-h-24 font-mono text-sm"
+                  className="min-h-24 max-h-[30vh] font-mono text-sm overflow-y-auto resize-none"
                 />
               </div>
             )}

@@ -180,7 +180,9 @@ export function NotesTree({
   }, [notes, selectedNoteId, onSelectNote]);
 
   const renderFlatView = useCallback(() => {
-    return notes.map((note) => (
+    const sortedNotes = [...notes].sort((a, b) => b.updatedAt - a.updatedAt);
+
+    return sortedNotes.map((note) => (
       <NoteItem
         key={note.id}
         note={note}

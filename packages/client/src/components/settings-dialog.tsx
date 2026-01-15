@@ -642,7 +642,7 @@ export function SettingsDialog({
                       settingsStore.setCategoryRecognitionPrompt(e.target.value)
                     }
                     placeholder="Enter the prompt for automatic category recognition..."
-                    className="min-h-37.5 font-mono text-sm"
+                    className="min-h-37.5 max-h-[30vh] font-mono text-sm overflow-y-auto resize-none"
                   />
                   <p className="text-xs text-muted-foreground">
                     This template uses Jinja2 syntax and automatically includes all your configured categories. 
@@ -668,7 +668,7 @@ export function SettingsDialog({
                           settingsStore.setGenericEnrichmentPrompt(e.target.value)
                         }
                         placeholder="Enter the generic prompt that will be applied to all categories..."
-                        className="min-h-25 font-mono text-sm"
+                        className="min-h-25 max-h-[30vh] font-mono text-sm overflow-y-auto resize-none"
                       />
                       <p className="text-xs text-muted-foreground italic">
                         Example: "Enhance. Never modify the original intent / meaning —only add valuable insights."
@@ -1095,7 +1095,7 @@ export function SettingsDialog({
                         settingsStore.setCategoryRecognitionPrompt(e.target.value)
                       }
                       placeholder="Enter the category prompt..."
-                      className="min-h-30 font-mono text-sm"
+                      className="min-h-30 max-h-[30vh] font-mono text-sm overflow-y-auto resize-none"
                     />
                     <p className="text-xs text-muted-foreground">
                       This template uses Jinja2 syntax and automatically includes all your configured categories. 
@@ -1124,7 +1124,7 @@ export function SettingsDialog({
                         settingsStore.setGenericEnrichmentPrompt(e.target.value)
                       }
                       placeholder="Enter the generic prompt..."
-                      className="min-h-20 font-mono text-sm"
+                      className="min-h-20 max-h-[30vh] font-mono text-sm overflow-y-auto resize-none"
                     />
                     <p className="text-xs text-muted-foreground italic">
                       Applied to all categories as a base instruction

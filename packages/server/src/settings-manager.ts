@@ -91,6 +91,32 @@ export class SettingsManager {
   }
 
   /**
+   * Save settings to file system
+   */
+  async save(settings: Settings): Promise<void> {
+    await this.adapter.save(settings);
+    // Update in-memory config after successful save
+    this.config = extractServerConfig(settings);
+  }
+
+  /**
+   * Update server configuration (partial update)
+   */
+  async updateConfig(updates: Partial<ServerConfig>): Promise<void> {
+    // Load current full settings
+    const currentSettings = await this.adapter.load();
+    
+    // Merge updates
+    const updatedSettings: Settings = {
+      ...currentSettings,
+      ...updates,
+    };
+    
+    // Save back to filesystem
+    await this.save(updatedSettings);
+  }
+
+  /**
    * Check if settings have been loaded
    */
   isSettingsLoaded(): boolean {
@@ -102,6 +128,13 @@ export class SettingsManager {
    */
   getSettingsPath(): string {
     return this.adapter.getPath();
+  }
+
+  /**
+   * Get the adapter instance (for advanced operations)
+   */
+  getAdapter(): FileSystemSettingsAdapter {
+    return this.adapter;
   }
 }
 

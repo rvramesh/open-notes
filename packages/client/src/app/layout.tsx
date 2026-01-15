@@ -1,5 +1,7 @@
 import { ThemeProvider } from "@/components/theme-provider";
 import { FontSizeProvider } from "@/components/font-size-provider";
+import { Toaster } from "@/components/ui/sonner";
+import { ApiErrorHandler } from "@/components/api-error-handler";
 import type React from "react";
 
 interface RootLayoutProps {
@@ -11,6 +13,8 @@ export default function RootLayout({ children }: RootLayoutProps) {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <FontSizeProvider>
         {children}
+        <Toaster />
+        <ApiErrorHandler />
       </FontSizeProvider>
     </ThemeProvider>
   );

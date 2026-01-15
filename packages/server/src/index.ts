@@ -1,8 +1,12 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { getSettingsManager } from "./settings-manager.js";
-import type { ServerConfig } from "./adapters/FileSystemSettingsAdapter.js";
+import { registerRoutes } from "./routes/index.js";
 
+/**
+ * Create and configure the Fastify application
+ * Sets up CORS, initializes settings, and registers all routes
+ */
 export async function createApp(devServerUrl?: string) {
   const fastify = Fastify({
     logger: true,
@@ -50,20 +54,8 @@ export async function createApp(devServerUrl?: string) {
     credentials: true,
   });
 
-  fastify.get("/health", async (request, reply) => {
-    return { status: "ok" };
-  });
-
-  // Settings endpoints
-  fastify.get<{ Reply: ServerConfig }>("/api/settings", async (request, reply) => {
-    const config = await settingsManager.getConfig();
-    return config;
-  });
-
-  fastify.post("/api/settings/reload", async (request, reply) => {
-    await settingsManager.reload();
-    return { success: true, message: "Settings reloaded successfully" };
-  });
+  // Register all API routes
+  await registerRoutes(fastify);
 
   return fastify;
 }

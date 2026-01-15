@@ -1,11 +1,11 @@
 /**
  * Hook for using the settings store
  * 
- * Provides a singleton instance of the settings store with localStorage persistence.
+ * Provides a singleton instance of the settings store with hybrid (localStorage + server) persistence.
  */
 
 import { createSettingsStore } from '../stores/settings.store';
-import { LocalStorageSettingsAdapter } from '../adapters/LocalStorageSettingsAdapter';
+import { HybridSettingsAdapter } from '../adapters/HybridSettingsAdapter';
 import type { SettingsStore } from '../stores';
 
 /**
@@ -14,12 +14,12 @@ import type { SettingsStore } from '../stores';
 let settingsStoreInstance: ReturnType<typeof createSettingsStore> | null = null;
 
 /**
- * Initialize the settings store with localStorage adapter
+ * Initialize the settings store with hybrid adapter (localStorage + server)
  * Call this once at app startup
  */
 export const initializeSettingsStore = () => {
   if (!settingsStoreInstance) {
-    const adapter = new LocalStorageSettingsAdapter();
+    const adapter = new HybridSettingsAdapter();
     settingsStoreInstance = createSettingsStore(adapter);
   }
   return settingsStoreInstance;
