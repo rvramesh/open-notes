@@ -28,6 +28,29 @@ function HealthStatus() {
 function App() {
   const [count, setCount] = useState(0);
 
+  // Listen for API errors and dispatch toast events
+  useEffect(() => {
+    const handleApiError = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const message = customEvent.detail?.message || "An error occurred";
+      
+      // Dispatch toast event
+      const toastEvent = new CustomEvent('show-toast', {
+        detail: {
+          message,
+          type: 'error',
+          timestamp: customEvent.detail?.timestamp || new Date().toISOString(),
+        },
+      });
+      window.dispatchEvent(toastEvent);
+    };
+
+    window.addEventListener('api-error', handleApiError);
+    return () => {
+      window.removeEventListener('api-error', handleApiError);
+    };
+  }, []);
+
   return (
     <>
       <Suspense fallback={<p>Loading health status...</p>}>

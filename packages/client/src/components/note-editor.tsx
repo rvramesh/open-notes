@@ -18,17 +18,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import type { Category, Note, Tag } from "@/lib/types";
 import { cn, formatRelativeTime, isMacOS } from "@/lib/utils";
@@ -51,6 +41,7 @@ import { debounce } from "lodash";
 import { PlateEditor } from "./plate-editor";
 import { useSettings } from "@/hooks/use-settings";
 import { CategoryModal } from "@/components/category-modal";
+import { processNote } from "@/lib/processNotes";
 
 interface NoteEditorProps {
   note: Note | null;
@@ -99,9 +90,6 @@ export function NoteEditor({
   onUpdateNote,
   onAddTag,
   onAddCategory,
-  onRemoveTag,
-  onRemoveCategory,
-  onOpenSettingsWithCategory,
   onSearchByCategory,
   onSearchByTag,
   onDeleteNote,
@@ -112,8 +100,6 @@ export function NoteEditor({
   const [showEnriched, setShowEnriched] = useState(false);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const [isAddingCategory, setIsAddingCategory] = useState(false);
-  const [newTagName, setNewTagName] = useState("");
-  const [newCategoryName, setNewCategoryName] = useState("");
   const [tagFilter, setTagFilter] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [selectedCategoryIndex, setSelectedCategoryIndex] = useState(-1);
@@ -131,9 +117,14 @@ export function NoteEditor({
   const noteIdRef = useRef<string | null>(null);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const editorInstanceRef = useRef<any>(null); // Store the editor instance
   const latestTitleRef = useRef<string>("");
   const latestContentStringRef = useRef<string>("");
   const onUpdateNoteRef = useRef(onUpdateNote);
+  const processingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastSavedTimestampRef = useRef<number>(0);
+  const isProcessingRef = useRef<boolean>(false);
+  const notesMapRef = useRef<Record<string, Note>>({});
 
   // Serialize contentBlocks to JSON string for the editor
   // Only recompute when note changes to avoid unnecessary re-renders
@@ -167,7 +158,92 @@ export function NoteEditor({
     latestContentStringRef.current = contentString;
     onUpdateNoteRef.current = onUpdateNote;
     noteIdRef.current = noteId;
-  }, [title, contentString, onUpdateNote, noteId]);
+    if (note) {
+      notesMapRef.current[note.id] = note;
+    }
+  }, [title, contentString, onUpdateNote, noteId, note]);
+
+  // Cancel processing if user makes changes
+  useEffect(() => {
+    if (hasChanges && processingTimerRef.current) {
+      clearTimeout(processingTimerRef.current);
+      processingTimerRef.current = null;
+    }
+  }, [hasChanges]);
+
+  // Schedule processing after save if note remains stable
+  const scheduleProcessing = useCallback(() => {
+    // Clear any existing processing timer
+    if (processingTimerRef.current) {
+      clearTimeout(processingTimerRef.current);
+    }
+
+    // Record when save completed
+    lastSavedTimestampRef.current = Date.now();
+
+    // Schedule processing after configured delay
+    const processingDelay = settings.editorSettings.enrichmentDelay || 10;
+
+    processingTimerRef.current = setTimeout(async () => {
+      // Check if note exists and not already processing
+      if (!noteIdRef.current || isProcessingRef.current) {
+        return;
+      }
+
+      // Check if enough time has passed without changes
+      const timeSinceLastSave = Date.now() - lastSavedTimestampRef.current;
+      if (timeSinceLastSave < processingDelay * 1000) {
+        return;
+      }
+
+      isProcessingRef.current = true;
+
+      try {
+        const currentNote = noteIdRef.current ? notesMapRef.current?.[noteIdRef.current] : null;
+        if (!currentNote || !editorInstanceRef.current) return;
+
+        // Serialize the editor content to markdown
+        const editorMarkdown = editorInstanceRef.current.api?.markdown?.serialize?.();
+        const contentOnly = editorMarkdown?.trim() || '';
+        
+        // Add title as the first line with # prefix, followed by the content
+        const contentMarkdown = currentNote.title 
+          ? `# ${currentNote.title}\n\n${contentOnly}`
+          : contentOnly || '(Empty note content)';
+        
+        console.log('DEBUG note-editor - contentMarkdown:', contentMarkdown.substring(0, 200));
+
+        // Process the note (categorize and enrich)
+        const updates = await processNote(currentNote, contentMarkdown, {
+          categories,
+          categoryPrompt: settings.categoryRecognitionPrompt,
+          genericEnrichmentPrompt: settings.genericEnrichmentPrompt,
+        });
+
+        console.log('📝 [note-editor] ProcessNote returned updates:', updates);
+
+        // Apply updates if any were generated
+        if (Object.keys(updates).length > 0) {
+          console.log('📝 [note-editor] Applying updates to note:', noteIdRef.current, updates);
+          await onUpdateNoteRef.current(noteIdRef.current, updates);
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('Failed to process note:', error);
+        
+        // Dispatch api-error event for toast notification
+        const event = new CustomEvent('api-error', {
+          detail: {
+            message: errorMessage,
+            timestamp: new Date().toISOString(),
+          },
+        });
+        window.dispatchEvent(event);
+      } finally {
+        isProcessingRef.current = false;
+      }
+    }, processingDelay * 1000);
+  }, [categories, settings.categoryRecognitionPrompt, settings.genericEnrichmentPrompt, settings.editorSettings.enrichmentDelay]);
 
   // Create debounced save function using the save delay from settings (in seconds, convert to ms)
   // Recreate when settings change
@@ -198,6 +274,9 @@ export function NoteEditor({
         setIsSaved(true);
         setHasChanges(false);
         pendingContentRef.current = null;
+
+        // Schedule processing after successful save
+        scheduleProcessing();
       } catch (error) {
         console.error("Failed to save note:", error);
         setIsSaving(false);
@@ -206,12 +285,15 @@ export function NoteEditor({
         saveInProgressRef.current = false;
       }
     }, (settings.editorSettings.autoSaveInterval || 10) * 1000);
-  }, [settings.editorSettings.autoSaveInterval]);
+  }, [settings.editorSettings.autoSaveInterval, scheduleProcessing]);
 
   // Cleanup debounce on unmount
   useEffect(() => {
     return () => {
       debouncedSave.cancel();
+      if (processingTimerRef.current) {
+        clearTimeout(processingTimerRef.current);
+      }
     };
   }, [debouncedSave]);
 
@@ -245,6 +327,9 @@ export function NoteEditor({
       setIsSaved(true);
       setHasChanges(false);
       pendingContentRef.current = null;
+
+      // Schedule processing after successful manual save
+      scheduleProcessing();
     } catch (error) {
       console.error("Failed to save note:", error);
       setIsSaving(false);
@@ -252,7 +337,7 @@ export function NoteEditor({
     } finally {
       saveInProgressRef.current = false;
     }
-  }, [hasChanges, onUpdateNote, debouncedSave]);
+  }, [noteIdRef, hasChanges, debouncedSave, onUpdateNote, scheduleProcessing]);
 
   // Handle Ctrl+S / Cmd+S keyboard shortcut
   useEffect(() => {
@@ -452,6 +537,22 @@ export function NoteEditor({
     return -1;
   }, [filteredTags.length, tagFilter, isAddingTag]);
 
+  // Compute system tags unconditionally (must be called at the top level, not inside conditionals)
+  const noteSystemTags = useMemo(
+    () => !note ? [] : note.tags.system.map((id) => ({ id, name: id, color: getTagColor(id) })),
+    [note]
+  );
+
+  const noteCategory = useMemo(
+    () => !note || !note.category ? undefined : categories.find((cat) => cat.id === note.category),
+    [note, categories]
+  );
+
+  const noteTags = useMemo(
+    () => !note ? [] : tags.filter((tag) => note.tags.user.includes(tag.id)),
+    [note, tags]
+  );
+
   const handleCategoryClick = useCallback((categoryId: string, e: React.MouseEvent) => {
     if (!e.defaultPrevented && onSearchByCategory) {
       onSearchByCategory(categoryId);
@@ -508,9 +609,6 @@ export function NoteEditor({
       </div>
     );
   }
-
-  const noteTags = tags.filter((tag) => note.tags.user.includes(tag.id));
-  const noteCategory = note.category ? categories.find((cat) => cat.id === note.category) : undefined;
 
   return (
     <div className="flex-1 flex flex-col px-0 md:px-4 pb-3 min-h-0 notes-section">
@@ -637,7 +735,16 @@ export function NoteEditor({
               </div>
             </div>
           ) : (
-            <PlateEditor ref={editorContainerRef} content={contentString} onChange={handleContentChange} noteId={noteId} onBlur={handleSaveNow} />
+            <PlateEditor 
+              ref={editorContainerRef} 
+              content={contentString} 
+              onChange={handleContentChange} 
+              noteId={noteId} 
+              onBlur={handleSaveNow}
+              onEditorReady={(editor) => {
+                editorInstanceRef.current = editor;
+              }}
+            />
           )}
         </div>
 
@@ -700,7 +807,6 @@ export function NoteEditor({
                         }}
                         onKeyDown={(e) => {
                           const maxIndex = filteredCategories.length > 0 ? filteredCategories.length - 1 : 0;
-                          const currentIndex = selectedCategoryIndex === -1 ? computedCategoryIndex : selectedCategoryIndex;
                           
                           if (e.key === "ArrowDown") {
                             e.preventDefault();
@@ -782,9 +888,10 @@ export function NoteEditor({
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs font-medium text-muted-foreground">TAGS</span>
+              <span className="text-xs font-medium text-muted-foreground">USER TAGS</span>
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {/* User Tags */}
               {noteTags.map((tag) => (
                 <button
                   key={tag.id}
@@ -835,7 +942,6 @@ export function NoteEditor({
                       }}
                       onKeyDown={(e) => {
                         const maxIndex = filteredTags.length > 0 ? filteredTags.length - 1 : 0;
-                        const currentIndex = selectedTagIndex === -1 ? computedTagIndex : selectedTagIndex;
                         
                         if (e.key === "ArrowDown") {
                           e.preventDefault();
@@ -912,6 +1018,31 @@ export function NoteEditor({
                 </PopoverContent>
               </Popover>
             </div>
+
+            {/* System Tags Section (AI-generated, read-only) */}
+            {noteSystemTags.length > 0 && (
+              <>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-xs font-medium text-muted-foreground">SYSTEM TAGS (AI)</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {noteSystemTags.map((tag) => (
+                    <button
+                      key={`system-${tag.id}`}
+                      onClick={(e) => handleTagClick(tag.id, e)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-full text-xs font-medium transition-all flex items-center gap-1 opacity-75 cursor-pointer",
+                        "border border-dashed",
+                        tagColorClasses[tag.color as keyof typeof tagColorClasses]
+                      )}
+                      title="AI-generated tag (read-only)"
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

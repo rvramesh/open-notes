@@ -81,6 +81,7 @@ Respond with just the category name. If none match, respond with "General".`,
   editorSettings: {
     autoSave: true,
     autoSaveInterval: 10, // 10 seconds
+    enrichmentDelay: 10, // 10 seconds
   },
 };
 

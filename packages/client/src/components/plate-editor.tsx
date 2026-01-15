@@ -12,12 +12,13 @@ interface PlateEditorProps {
   onChange: (content: string) => void;
   noteId?: string | null; // Add noteId to force remount when switching notes
   onBlur?: () => void; // Save immediately on blur
+  onEditorReady?: (editor: any) => void; // Callback when editor is ready
 }
 
 export const PlateEditor = React.forwardRef<
   HTMLDivElement,
   PlateEditorProps
->(function PlateEditorComponent({ content, onChange, noteId, onBlur }, ref) {
+>(function PlateEditorComponent({ content, onChange, noteId, onBlur, onEditorReady }, ref) {
   // Parse initial content or use default
   const initialValue = content ? parseContent(content) : getDefaultContent();
 
@@ -42,6 +43,13 @@ export const PlateEditor = React.forwardRef<
     plugins: EditorKit,
     value: initialValue,
   });
+
+  // Notify parent when editor is ready
+  React.useEffect(() => {
+    if (editor && onEditorReady) {
+      onEditorReady(editor);
+    }
+  }, [editor, onEditorReady]);
 
   // Listen for editor changes using polling (more compatible with Plate.js)
   React.useEffect(() => {

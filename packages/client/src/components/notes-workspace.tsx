@@ -8,9 +8,12 @@ import { CategorySelectionModal } from "@/components/category-selection-modal";
 import type { Note } from "@/lib/types";
 import { getTagColor } from "@/lib/tag-utils";
 import { useNotesStore, useTagsStore, useCategoriesStore } from "@/lib/store";
+import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useMemo, useCallback } from "react";
 
 export function NotesWorkspace() {
+  // Toast notifications
+  const { toast } = useToast();
   // Store state - use stable selectors
   const notesMap = useNotesStore((state) => state.notes);
   const orderedNoteIds = useNotesStore((state) => state.orderedNoteIds);
@@ -61,6 +64,26 @@ export function NotesWorkspace() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [showCategorySelection, setShowCategorySelection] = useState(false);
 
+  // Listen for API errors and show toasts
+  useEffect(() => {
+    const handleShowToast = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { message, type } = customEvent.detail || {};
+      
+      if (message) {
+        toast({
+          description: message,
+          variant: type === 'error' ? 'destructive' : 'default',
+        });
+      }
+    };
+
+    window.addEventListener('show-toast', handleShowToast);
+    return () => {
+      window.removeEventListener('show-toast', handleShowToast);
+    };
+  }, [toast]);
+
   // Load notes, tags, and categories on mount
   useEffect(() => {
     Promise.all([
@@ -83,12 +106,19 @@ export function NotesWorkspace() {
 
   const handleUpdateNote = useCallback(
     async (noteId: string, updates: Partial<typeof selectedNote>) => {
+      console.log('📝 [handleUpdateNote] Updating note:', noteId, 'with updates:', updates);
       await updateNote(noteId, (note) => ({
         ...note,
         ...updates,
       }));
+      
+      // If system tags were updated, refresh the tags store
+      if (updates?.tags?.system && updates.tags.system.length > 0) {
+        console.log('📝 [handleUpdateNote] Refreshing tags store due to system tags update');
+        await refreshTags();
+      }
     },
-    [updateNote]
+    [updateNote, refreshTags]
   );
 
   const handleCreateNote = async () => {

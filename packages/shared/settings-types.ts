@@ -44,6 +44,15 @@ export type ColorName =
   | 'slate';
 
 /**
+ * Custom HTTP header for API requests
+ */
+export interface CustomHeader {
+  id: string; // Unique identifier
+  name: string; // Header name (e.g., 'X-Custom-Header')
+  value: string; // Header value
+}
+
+/**
  * AI model configuration
  */
 export interface ModelConfiguration {
@@ -51,6 +60,7 @@ export interface ModelConfiguration {
   modelName: string; // e.g., 'gpt-4', 'claude-3-opus', 'llama2'
   baseUrl?: string; // Optional custom API endpoint
   apiKey?: string; // Optional API key (encrypted or environment-based)
+  customHeaders?: CustomHeader[]; // Optional custom HTTP headers
 }
 
 /**
@@ -70,6 +80,7 @@ export interface Category {
 export interface EditorSettings {
   autoSave: boolean;
   autoSaveInterval: number; // seconds - time to wait after last keystroke before saving
+  enrichmentDelay: number; // seconds - time to wait after save before triggering categorization/enrichment
 }
 
 /**
@@ -138,6 +149,7 @@ Available categories:
   editorSettings: {
     autoSave: true,
     autoSaveInterval: 10,
+    enrichmentDelay: 10,
   },
 };
 

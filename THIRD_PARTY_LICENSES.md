@@ -6,8 +6,8 @@ This document lists all third-party dependencies and their licenses.
 
 ## Summary
 
-- **Total Packages:** 142
-- **Approved Licenses:** 142
+- **Total Packages:** 144
+- **Approved Licenses:** 143
 - **Flagged Licenses:** 0
 
 ---
@@ -17,8 +17,11 @@ This document lists all third-party dependencies and their licenses.
 ### MIT-Compatible Licenses ✅
 
 
-#### Apache-2.0 (4)
+#### Apache-2.0 (5)
 
+- **@ai-sdk/openai** (v3.0.11)
+  Repository: git+https://github.com/vercel/ai.git
+  Homepage: https://ai-sdk.dev/docs
 - **@ai-sdk/react** (v2.0.28)
   Repository: git+https://github.com/vercel/ai.git
   Homepage: https://ai-sdk.dev/docs

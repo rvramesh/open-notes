@@ -49,7 +49,7 @@ export function CategoryModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-md max-h-[80vh] overflow-y-auto" style={{ zIndex: 60 }}>
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Category" : "Add Category"}
@@ -65,6 +65,7 @@ export function CategoryModal({
               <Input
                 ref={inputRef}
                 id="modal-category-name"
+                autoFocus
                 value={categoryData.name}
                 onChange={(e) =>
                   onUpdateCategory("name", e.target.value)

@@ -34,8 +34,18 @@ import type { Category } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useSettings } from "@/hooks/use-settings";
 import { CategoryModal } from "@/components/category-modal";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useCategoriesStore } from "@/lib/store";
-import { FolderTree, Settings, Trash2, Type, Eye, Pencil, Sparkles } from "lucide-react";
+import { FolderTree, Settings, Trash2, Type, Eye, Pencil, Sparkles, X } from "lucide-react";
 import { useEffect, useState, useMemo } from "react";
 
 interface SettingsDialogProps {
@@ -69,6 +79,8 @@ export function SettingsDialog({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [modalCategoryData, setModalCategoryData] = useState<Category | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   
   // Model accordion state
   const languageModelDefaultOpen = !settingsStore.languageModel?.modelName || !settingsStore.languageModel?.apiKey;
@@ -87,7 +99,7 @@ export function SettingsDialog({
         setActiveTab(preSelectTab);
       }
       if (preFillCategoryName && preSelectTab === "categories") {
-        // Add new category with pre-filled name at the top
+        // Open the category modal directly with a pre-filled name
         const tempId = `temp-${Date.now()}`;
         const newCategory: Category = {
           id: tempId,
@@ -96,15 +108,10 @@ export function SettingsDialog({
           enrichmentPrompt: "",
           noEnrichment: false,
         };
-        setEditingCategories((prev) => [newCategory, ...prev]);
+        setModalCategoryData(newCategory);
+        setEditingCategoryId(tempId);
         setNewCategoryIds(new Set([tempId]));
-
-        // Focus the input after a short delay
-        setTimeout(() => {
-          const input = document.getElementById(`category-name-${tempId}`) as HTMLInputElement;
-          input?.focus();
-          input?.select();
-        }, 100);
+        setModalOpen(true);
       }
     }
   }, [isOpen, preSelectTab, preFillCategoryName, allCategories]);
@@ -131,13 +138,9 @@ export function SettingsDialog({
     }
   };
 
-  const handleDeleteCategoryWithConfirm = async (id: string) => {
-    const category = editingCategories.find((c) => c.id === id);
-    const confirmed = window.confirm(
-      `Delete ${category?.name || "this category"}? This action cannot be undone.`
-    );
-    if (!confirmed) return;
-    await handleDeleteCategory(id);
+  const handleDeleteCategoryWithConfirm = (id: string) => {
+    setPendingDeleteId(id);
+    setConfirmOpen(true);
   };
 
   const handleAddNewCategory = () => {
@@ -364,7 +367,7 @@ export function SettingsDialog({
                       type="number"
                       min="1"
                       step="1"
-                      value={settingsStore.editorSettings.autoSaveInterval}
+                      value={settingsStore.editorSettings.autoSaveInterval ?? 10}
                       onChange={(e) => {
                         const value = e.target.value;
                         if (value === '') {
@@ -393,6 +396,43 @@ export function SettingsDialog({
                   </div>
                   <p className="text-xs text-muted-foreground">
                     Waits this long after you stop typing before automatically saving your note. Minimum: 1 second. If cleared, defaults to 10 seconds.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="enrichment-delay">Enrichment Delay After Save</Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="enrichment-delay"
+                      type="number"
+                      min="1"
+                      step="1"
+                      value={settingsStore.editorSettings.enrichmentDelay ?? 10}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '') {
+                          return;
+                        }
+                        const numValue = parseInt(value);
+                        if (!isNaN(numValue)) {
+                          settingsStore.setEditorSetting(
+                            "enrichmentDelay",
+                            Math.max(1, numValue)
+                          );
+                        }
+                      }}
+                      onBlur={(e) => {
+                        const value = parseInt(e.target.value);
+                        if (isNaN(value) || value < 1) {
+                          settingsStore.setEditorSetting("enrichmentDelay", 10);
+                        }
+                      }}
+                      className="flex-1"
+                    />
+                    <span className="text-sm text-muted-foreground min-w-fit">seconds</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Waits this long after saving before triggering AI categorization and enrichment. Only processes if note remains unchanged.
                   </p>
                 </div>
               </div>
@@ -507,6 +547,105 @@ export function SettingsDialog({
                     Your API key will be stored securely (optional)
                   </p>
                 </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Custom Headers</Label>
+                    <Button
+
+                      variant="outline"
+                      onClick={() => {
+                        const newHeader = {
+                          id: `header-${Date.now()}-${Math.random()}`,
+                          name: '',
+                          value: '',
+                        };
+                        const updatedHeaders = [...(settingsStore.languageModel?.customHeaders || []), newHeader];
+                        settingsStore.setLanguageModel({
+                          provider: settingsStore.languageModel?.provider || 'openai',
+                          modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                          baseUrl: settingsStore.languageModel?.baseUrl || "",
+                          apiKey: settingsStore.languageModel?.apiKey || "",
+                          customHeaders: updatedHeaders,
+                        });
+                      }}
+                    >
+                      Add Header
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add custom HTTP headers to be sent with API requests
+                  </p>
+                  
+                  {(settingsStore.languageModel?.customHeaders || []).length > 0 && (
+                    <div className="space-y-2 mt-3 p-3 bg-muted rounded-md">
+                      <div className="grid grid-cols-[1fr_1fr_40px] gap-2 text-xs font-medium text-muted-foreground mb-2">
+                        <div>Header Name</div>
+                        <div>Header Value</div>
+                        <div />
+                      </div>
+                      {settingsStore.languageModel?.customHeaders?.map((header, index) => (
+                        <div key={header.id} className="grid grid-cols-[1fr_1fr_40px] gap-2 items-center">
+                          <Input
+                            aria-label="Header name"
+                            aria-labelledby={`lang-header-name-group-${header.id}`}
+                            id={`lang-header-name-${header.id}`}
+                            placeholder="e.g., X-Custom-Header"
+                            value={header.name}
+                            onChange={(e) => {
+                              const updated = settingsStore.languageModel?.customHeaders?.map(h =>
+                                h.id === header.id ? { ...h, name: e.target.value } : h
+                              ) || [];
+                              settingsStore.setLanguageModel({
+                                provider: settingsStore.languageModel?.provider || 'openai',
+                                modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                apiKey: settingsStore.languageModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          />
+                          <Input
+                            aria-label="Header value"
+                            aria-labelledby={`lang-header-value-group-${header.id}`}
+                            id={`lang-header-value-${header.id}`}
+                            placeholder="header value"
+                            value={header.value}
+                            onChange={(e) => {
+                              const updated = settingsStore.languageModel?.customHeaders?.map(h =>
+                                h.id === header.id ? { ...h, value: e.target.value } : h
+                              ) || [];
+                              settingsStore.setLanguageModel({
+                                provider: settingsStore.languageModel?.provider || 'openai',
+                                modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                apiKey: settingsStore.languageModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Delete header"
+                            onClick={() => {
+                              const updated = settingsStore.languageModel?.customHeaders?.filter(h => h.id !== header.id) || [];
+                              settingsStore.setLanguageModel({
+                                provider: settingsStore.languageModel?.provider || 'openai',
+                                modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                apiKey: settingsStore.languageModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -612,6 +751,105 @@ export function SettingsDialog({
                     Your API key will be stored securely (optional)
                   </p>
                 </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>Custom Headers</Label>
+                    <Button
+
+                      variant="outline"
+                      onClick={() => {
+                        const newHeader = {
+                          id: `header-${Date.now()}-${Math.random()}`,
+                          name: '',
+                          value: '',
+                        };
+                        const updatedHeaders = [...(settingsStore.embeddingModel?.customHeaders || []), newHeader];
+                        settingsStore.setEmbeddingModel({
+                          provider: settingsStore.embeddingModel?.provider || 'openai',
+                          modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                          baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                          apiKey: settingsStore.embeddingModel?.apiKey || "",
+                          customHeaders: updatedHeaders,
+                        });
+                      }}
+                    >
+                      Add Header
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Add custom HTTP headers to be sent with API requests
+                  </p>
+                  
+                  {(settingsStore.embeddingModel?.customHeaders || []).length > 0 && (
+                    <div className="space-y-2 mt-3 p-3 bg-muted rounded-md">
+                      <div className="grid grid-cols-[1fr_1fr_40px] gap-2 text-xs font-medium text-muted-foreground mb-2">
+                        <div>Header Name</div>
+                        <div>Header Value</div>
+                        <div />
+                      </div>
+                      {settingsStore.embeddingModel?.customHeaders?.map((header, index) => (
+                        <div key={header.id} className="grid grid-cols-[1fr_1fr_40px] gap-2 items-center">
+                          <Input
+                            aria-label="Header name"
+                            aria-labelledby={`emb-header-name-group-${header.id}`}
+                            id={`emb-header-name-${header.id}`}
+                            placeholder="e.g., X-Custom-Header"
+                            value={header.name}
+                            onChange={(e) => {
+                              const updated = settingsStore.embeddingModel?.customHeaders?.map(h =>
+                                h.id === header.id ? { ...h, name: e.target.value } : h
+                              ) || [];
+                              settingsStore.setEmbeddingModel({
+                                provider: settingsStore.embeddingModel?.provider || 'openai',
+                                modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          />
+                          <Input
+                            aria-label="Header value"
+                            aria-labelledby={`emb-header-value-group-${header.id}`}
+                            id={`emb-header-value-${header.id}`}
+                            placeholder="header value"
+                            value={header.value}
+                            onChange={(e) => {
+                              const updated = settingsStore.embeddingModel?.customHeaders?.map(h =>
+                                h.id === header.id ? { ...h, value: e.target.value } : h
+                              ) || [];
+                              settingsStore.setEmbeddingModel({
+                                provider: settingsStore.embeddingModel?.provider || 'openai',
+                                modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          />
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            aria-label="Delete header"
+                            onClick={() => {
+                              const updated = settingsStore.embeddingModel?.customHeaders?.filter(h => h.id !== header.id) || [];
+                              settingsStore.setEmbeddingModel({
+                                provider: settingsStore.embeddingModel?.provider || 'openai',
+                                modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                customHeaders: updated,
+                              });
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                       </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -684,7 +922,7 @@ export function SettingsDialog({
                       </div>
                       <Button
                         onClick={handleAddNewCategory}
-                        size="sm"
+
                         variant="outline"
                         disabled={modalOpen}
                       >
@@ -850,7 +1088,7 @@ export function SettingsDialog({
                         type="number"
                         min="1"
                         step="1"
-                        value={settingsStore.editorSettings.autoSaveInterval}
+                        value={settingsStore.editorSettings.autoSaveInterval ?? 10}
                         onChange={(e) => {
                           const value = e.target.value;
                           if (value === '') {
@@ -879,6 +1117,43 @@ export function SettingsDialog({
                     </div>
                     <p className="text-xs text-muted-foreground">
                       Waits this long after you stop typing before automatically saving. Minimum: 1 second. If cleared, defaults to 10 seconds.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="enrichment-delay-mobile">Enrichment Delay After Save</Label>
+                    <div className="flex items-center gap-2">
+                      <Input
+                        id="enrichment-delay-mobile"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={settingsStore.editorSettings.enrichmentDelay ?? 10}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          if (value === '') {
+                            return;
+                          }
+                          const numValue = parseInt(value);
+                          if (!isNaN(numValue)) {
+                            settingsStore.setEditorSetting(
+                              "enrichmentDelay",
+                              Math.max(1, numValue)
+                            );
+                          }
+                        }}
+                        onBlur={(e) => {
+                          const value = parseInt(e.target.value);
+                          if (isNaN(value) || value < 1) {
+                            settingsStore.setEditorSetting("enrichmentDelay", 10);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <span className="text-sm text-muted-foreground min-w-fit">seconds</span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      Waits this long after saving before triggering AI categorization and enrichment. Only processes if note remains unchanged.
                     </p>
                   </div>
                 </div>
@@ -980,6 +1255,102 @@ export function SettingsDialog({
                         placeholder="sk-..."
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Custom Headers</Label>
+                        <Button
+
+                          variant="outline"
+                          onClick={() => {
+                            const newHeader = {
+                              id: `header-${Date.now()}-${Math.random()}`,
+                              name: '',
+                              value: '',
+                            };
+                            const updatedHeaders = [...(settingsStore.languageModel?.customHeaders || []), newHeader];
+                            settingsStore.setLanguageModel({
+                              provider: settingsStore.languageModel?.provider || 'openai',
+                              modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                              baseUrl: settingsStore.languageModel?.baseUrl || "",
+                              apiKey: settingsStore.languageModel?.apiKey || "",
+                              customHeaders: updatedHeaders,
+                            });
+                          }}
+                        >
+                          Add Header
+                        </Button>
+                      </div>
+                      
+                      {(settingsStore.languageModel?.customHeaders || []).length > 0 && (
+                        <div className="space-y-2 mt-3 p-3 bg-muted rounded-md">
+                          <div className="text-xs font-medium text-muted-foreground mb-2 grid grid-cols-[1fr_40px] gap-2">
+                            <div>Header Name / Value</div>
+                            <div />
+                          </div>
+                          {settingsStore.languageModel?.customHeaders?.map((header, index) => (
+                            <div key={header.id} className="space-y-2">
+                              <Input
+                                aria-label="Header name"
+                                id={`lang-header-name-mobile-${header.id}`}
+                                placeholder="e.g., X-Custom-Header"
+                                value={header.name}
+                                onChange={(e) => {
+                                  const updated = settingsStore.languageModel?.customHeaders?.map(h =>
+                                    h.id === header.id ? { ...h, name: e.target.value } : h
+                                  ) || [];
+                                  settingsStore.setLanguageModel({
+                                    provider: settingsStore.languageModel?.provider || 'openai',
+                                    modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                    baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                    apiKey: settingsStore.languageModel?.apiKey || "",
+                                    customHeaders: updated,
+                                  });
+                                }}
+                              />
+                              <div className="flex gap-2 items-end">
+                                <Input
+                                  aria-label="Header value"
+                                  id={`lang-header-value-mobile-${header.id}`}
+                                  placeholder="header value"
+                                  value={header.value}
+                                  onChange={(e) => {
+                                    const updated = settingsStore.languageModel?.customHeaders?.map(h =>
+                                      h.id === header.id ? { ...h, value: e.target.value } : h
+                                    ) || [];
+                                    settingsStore.setLanguageModel({
+                                      provider: settingsStore.languageModel?.provider || 'openai',
+                                      modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                      baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                      apiKey: settingsStore.languageModel?.apiKey || "",
+                                      customHeaders: updated,
+                                    });
+                                  }}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  aria-label="Delete header"
+                                  onClick={() => {
+                                    const updated = settingsStore.languageModel?.customHeaders?.filter(h => h.id !== header.id) || [];
+                                    settingsStore.setLanguageModel({
+                                      provider: settingsStore.languageModel?.provider || 'openai',
+                                      modelName: settingsStore.languageModel?.modelName || 'gpt-4',
+                                      baseUrl: settingsStore.languageModel?.baseUrl || "",
+                                      apiKey: settingsStore.languageModel?.apiKey || "",
+                                      customHeaders: updated,
+                                    });
+                                  }}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -1069,6 +1440,102 @@ export function SettingsDialog({
                         placeholder="sk-..."
                       />
                     </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Custom Headers</Label>
+                        <Button
+
+                          variant="outline"
+                          onClick={() => {
+                            const newHeader = {
+                              id: `header-${Date.now()}-${Math.random()}`,
+                              name: '',
+                              value: '',
+                            };
+                            const updatedHeaders = [...(settingsStore.embeddingModel?.customHeaders || []), newHeader];
+                            settingsStore.setEmbeddingModel({
+                              provider: settingsStore.embeddingModel?.provider || 'openai',
+                              modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                              baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                              apiKey: settingsStore.embeddingModel?.apiKey || "",
+                              customHeaders: updatedHeaders,
+                            });
+                          }}
+                        >
+                          Add Header
+                        </Button>
+                      </div>
+                      
+                      {(settingsStore.embeddingModel?.customHeaders || []).length > 0 && (
+                        <div className="space-y-2 mt-3 p-3 bg-muted rounded-md">
+                          <div className="text-xs font-medium text-muted-foreground mb-2 grid grid-cols-[1fr_40px] gap-2">
+                            <div>Header Name / Value</div>
+                            <div />
+                          </div>
+                          {settingsStore.embeddingModel?.customHeaders?.map((header, index) => (
+                            <div key={header.id} className="space-y-2">
+                              <Input
+                                aria-label="Header name"
+                                id={`emb-header-name-mobile-${header.id}`}
+                                placeholder="e.g., X-Custom-Header"
+                                value={header.name}
+                                onChange={(e) => {
+                                  const updated = settingsStore.embeddingModel?.customHeaders?.map(h =>
+                                    h.id === header.id ? { ...h, name: e.target.value } : h
+                                  ) || [];
+                                  settingsStore.setEmbeddingModel({
+                                    provider: settingsStore.embeddingModel?.provider || 'openai',
+                                    modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                    baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                    apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                    customHeaders: updated,
+                                  });
+                                }}
+                              />
+                              <div className="flex gap-2 items-end">
+                                <Input
+                                  aria-label="Header value"
+                                  id={`emb-header-value-mobile-${header.id}`}
+                                  placeholder="header value"
+                                  value={header.value}
+                                  onChange={(e) => {
+                                    const updated = settingsStore.embeddingModel?.customHeaders?.map(h =>
+                                      h.id === header.id ? { ...h, value: e.target.value } : h
+                                    ) || [];
+                                    settingsStore.setEmbeddingModel({
+                                      provider: settingsStore.embeddingModel?.provider || 'openai',
+                                      modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                      baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                      apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                      customHeaders: updated,
+                                    });
+                                  }}
+                                  className="flex-1"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  aria-label="Delete header"
+                                  onClick={() => {
+                                    const updated = settingsStore.embeddingModel?.customHeaders?.filter(h => h.id !== header.id) || [];
+                                    settingsStore.setEmbeddingModel({
+                                      provider: settingsStore.embeddingModel?.provider || 'openai',
+                                      modelName: settingsStore.embeddingModel?.modelName || 'text-embedding-3-small',
+                                      baseUrl: settingsStore.embeddingModel?.baseUrl || "",
+                                      apiKey: settingsStore.embeddingModel?.apiKey || "",
+                                      customHeaders: updated,
+                                    });
+                                  }}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                         </div>
                       </AccordionContent>
                     </AccordionItem>
@@ -1135,7 +1602,7 @@ export function SettingsDialog({
                     <h4 className="text-sm font-semibold">Categories</h4>
                     <Button
                       onClick={handleAddNewCategory}
-                      size="sm"
+
                       variant="outline"
                     >
                       Add
@@ -1246,6 +1713,43 @@ export function SettingsDialog({
         isSaving={isSaving}
         isEditing={editingCategoryId ? !newCategoryIds.has(editingCategoryId) : false}
       />
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent style={{ zIndex: 60 }}>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Category</AlertDialogTitle>
+            <AlertDialogDescription>
+              {(() => {
+                const cat = pendingDeleteId ? editingCategories.find(c => c.id === pendingDeleteId) : undefined;
+                const name = cat?.name || "this category";
+                return `Delete ${name}? This action cannot be undone.`;
+              })()}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setConfirmOpen(false);
+                setPendingDeleteId(null);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                if (pendingDeleteId) {
+                  await handleDeleteCategory(pendingDeleteId);
+                }
+                setConfirmOpen(false);
+                setPendingDeleteId(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
     </TooltipProvider>
   );
