@@ -24,7 +24,7 @@ export class LocalStorageTagsAdapter implements TagsPersistenceAdapter {
     const allTags = new Set<string>();
 
     // Collect all unique tag strings from notes (both user and system tags)
-    Object.values(notes).forEach((note: { tags?: { user?: string[]; system?: string[] } }) => {
+    Object.values(notes).forEach((note: any) => {
       if (note.tags) {
         if (Array.isArray(note.tags.user)) {
           note.tags.user.forEach((tag: string) => allTags.add(normalizeTag(tag)));

@@ -18,7 +18,7 @@ export function FontSizeProvider({ children }: FontSizeProviderProps) {
     const root = document.documentElement;
 
     // Map fontSize to CSS variables and classes
-    const fontSizeMap = {
+    const fontSizeMap: Record<string, { size: string; scale: string }> = {
       sm: { size: "14px", scale: "0.875" }, // 14px base
       md: { size: "16px", scale: "1" }, // 16px base (default)
       lg: { size: "18px", scale: "1.125" }, // 18px base
@@ -36,7 +36,7 @@ export function FontSizeProvider({ children }: FontSizeProviderProps) {
     fontSizeClasses.forEach((cls) => root.classList.remove(cls));
 
     // Apply corresponding class for consistency
-    const classMap = {
+    const classMap: Record<string, string> = {
       sm: "text-sm",
       md: "text-base",
       lg: "text-lg",

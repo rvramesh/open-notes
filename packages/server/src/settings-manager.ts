@@ -4,9 +4,8 @@
  * Provides a singleton instance to access server configuration
  */
 
-import type { ServerConfig } from '@open-notes/shared/settings-types';
-import { validateServerConfig, DEFAULT_SETTINGS, extractServerConfig } from '@open-notes/shared/settings-types';
-import { FileSystemSettingsAdapter } from './adapters/FileSystemSettingsAdapter.js';
+import { FileSystemSettingsAdapter, DEFAULT_SETTINGS, extractServerConfig, validateServerConfig } from './adapters/FileSystemSettingsAdapter.js';
+import type { ServerConfig, Settings } from './adapters/FileSystemSettingsAdapter.js';
 
 /**
  * Settings manager class

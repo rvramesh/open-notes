@@ -5,11 +5,13 @@
  * Settings are persisted both locally and on the server
  */
 
-import type { Settings } from '@open-notes/shared/settings-types';
-import type {
-  SettingsStoreState,
-  SettingsPersistenceAdapter,
-} from '../lib/settings-types';
+import type { SettingsStoreState } from '../lib/settings-types';
+import type { SettingsPersistenceAdapter } from '../lib/settings-types';
+
+/**
+ * Settings serialized form (for storage)
+ */
+type StorageSettings = Omit<SettingsStoreState, 'adapter' | 'isLoading' | 'error'> & { lastSavedAt: number };
 
 /**
  * Hybrid adapter for settings persistence (local + server)
@@ -26,7 +28,7 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
    * Save settings to both localStorage and server
    */
   async save(settings: SettingsStoreState): Promise<void> {
-    const cleanSettings: Settings = {
+    const cleanSettings: StorageSettings = {
       theme: settings.theme,
       fontSize: settings.fontSize,
       languageModel: settings.languageModel,
@@ -67,7 +69,7 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
         return await this.loadFromServer();
       }
 
-      const loaded = JSON.parse(json) as Settings;
+      const loaded = JSON.parse(json) as StorageSettings;
       return this.toStoreState(loaded);
     } catch (error) {
       throw new Error(
@@ -79,7 +81,7 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
   /**
    * Sync settings to server
    */
-  private async syncToServer(settings: Settings): Promise<void> {
+  private async syncToServer(settings: StorageSettings): Promise<void> {
     // For now, we just log - implement actual sync endpoint later
     console.log('Settings synced to server (placeholder)');
     // Future implementation:
@@ -99,7 +101,7 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
       if (!response.ok) {
         return null;
       }
-      const settings = await response.json() as Settings;
+      const settings = await response.json() as StorageSettings;
       return this.toStoreState(settings);
     } catch {
       return null;
@@ -107,9 +109,9 @@ export class HybridSettingsAdapter implements SettingsPersistenceAdapter {
   }
 
   /**
-   * Convert Settings to SettingsStoreState
+   * Convert StorageSettings to SettingsStoreState
    */
-  private toStoreState(settings: Settings): SettingsStoreState {
+  private toStoreState(settings: StorageSettings): SettingsStoreState {
     return {
       ...settings,
       adapter: undefined,

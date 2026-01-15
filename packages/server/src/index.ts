@@ -1,7 +1,7 @@
 import cors from "@fastify/cors";
 import Fastify from "fastify";
 import { getSettingsManager } from "./settings-manager.js";
-import type { ServerConfig } from "@open-notes/shared/settings-types";
+import type { ServerConfig } from "./adapters/FileSystemSettingsAdapter.js";
 
 export async function createApp(devServerUrl?: string) {
   const fastify = Fastify({
@@ -12,7 +12,7 @@ export async function createApp(devServerUrl?: string) {
   const settingsManager = getSettingsManager();
   await settingsManager.load();
   
-  fastify.log.info('Server settings loaded from:', settingsManager.getSettingsPath());
+  fastify.log.info('Server settings loaded from: ' + settingsManager.getSettingsPath());
 
   // Configure CORS based on environment
   const allowedOrigins = ["file://", "http://localhost:3000", "http://127.0.0.1:3000"];

@@ -10,7 +10,8 @@ export type { NotesStore, NotesStoreState, NotesStoreActions } from './notes.sto
 
 // Settings store
 export { createSettingsStore, PREDEFINED_CATEGORIES } from './settings.store';
-export type { SettingsStore, SettingsStoreState, SettingsStoreActions } from '../lib/settings-types';
+export type { SettingsStore } from './settings.store';
+export type { SettingsStoreState, SettingsStoreActions } from '../lib/settings-types';
 
 // Adapters
 export { LocalStorageNotesAdapter } from '../adapters/LocalStorageNotesAdapter';
@@ -23,7 +24,6 @@ export type { SettingsPersistenceAdapter } from '../adapters/SettingsPersistence
 export type {
   ThemePreference,
   FontSize,
-  FontFamily,
   AIProvider,
   ModelConfiguration,
   Category,
